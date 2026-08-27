@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slither.io - Enterprise Engine Pro</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <!-- Usando a mesma rota local do socket.io para evitar conflito de versão com o servidor -->
+    <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html { width: 100%; height: 100%; background: #020208; overflow: hidden; font-family: system-ui, sans-serif; }
@@ -81,7 +82,6 @@
 </head>
 <body>
 
-    <!-- Menu Principal e Loja -->
     <div id="menu-overlay">
         <div class="menu-card">
             <h1>NEON SNAKE</h1>
@@ -92,23 +92,18 @@
                 <button class="tab-btn" onclick="switchTab('shop')">Loja de Skins</button>
             </div>
 
-            <!-- Aba Jogar -->
             <div id="tab-play" class="tab-content active">
                 <input type="text" id="nickname-input" class="menu-input" placeholder="Digite seu Nickname" maxlength="15" value="Player">
                 <button class="btn-play" id="play-btn">JOGAR AGORA</button>
             </div>
 
-            <!-- Aba Loja -->
             <div id="tab-shop" class="tab-content">
-                <div class="skin-grid" id="skin-grid">
-                    <!-- Gerado via JS -->
-                </div>
+                <div class="skin-grid" id="skin-grid"></div>
                 <p style="font-size: 11px; color: #aaa;">Clique para equipar ou comprar skins!</p>
             </div>
         </div>
     </div>
 
-    <!-- Tela de Game Over -->
     <div id="gameover-overlay">
         <div class="menu-card">
             <h1 style="color: #ff0055;">VOCÊ MORREU!</h1>
@@ -148,7 +143,6 @@
         const earnedCoinsEl = document.getElementById("earned-coins");
         const coinCountEl = document.getElementById("coin-count");
 
-        // Sistema de Moedas e Skins no LocalStorage
         let playerCoins = parseInt(localStorage.getItem('snake_coins') || '100');
         let unlockedSkins = JSON.parse(localStorage.getItem('snake_unlocked') || '["#00f0ff"]');
         let selectedColor = localStorage.getItem('snake_selected') || '#00f0ff';
@@ -227,7 +221,8 @@
         window.addEventListener('resize', resize);
         resize();
 
-        const socket = io("https://neon-snake-xzlj.onrender.com", { transports: ['websocket', 'polling'] });
+        // Conectando dinamicamente ao host atual (funciona local e no Render)
+        const socket = io();
 
         socket.on("connect", () => {
             statusEl.innerText = "Online";
@@ -278,7 +273,6 @@
             hudEl.style.display = 'none';
             lbEl.style.display = 'none';
             
-            // Calcula moedas com base no tamanho final alcançado
             let earned = Math.floor(data.score / 5);
             playerCoins += earned;
             updateShopUI();
