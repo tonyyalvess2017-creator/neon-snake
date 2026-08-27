@@ -32,7 +32,6 @@ for (let i = 0; i < 1500; i++) {
 // ==========================================
 // 3. SISTEMA DE BOTS COM NOMES PERSONALIZADOS
 // ==========================================
-// [MODIFICÁVEL] Lista de nomes customizada para os bots do servidor
 const botNames = ["Bernardo", "Gabriel", "Lucas", "Igor", "Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
 
 for (let i = 0; i < 15; i++) {
@@ -62,7 +61,7 @@ function spawnBot(id, name) {
 }
 
 // ==========================================
-// 4. CONEXÕES DOS JOGADORES
+// 4. CONEXÕES DOS JOGADORES E SINCRONIZAÇÃO BLINDADA
 // ==========================================
 io.on('connection', (socket) => {
     socket.on('player_join', (data) => {
@@ -77,10 +76,14 @@ io.on('connection', (socket) => {
         };
     });
 
+    // BLINDAGEM DA BORDA NO SERVIDOR: Impede que o cliente envie posições ilegais para fora do mapa
     socket.on('player_sync', (data) => {
         if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
+            let clampedX = Math.max(60, Math.min(MAP_SIZE - 60, data.x));
+            let clampedY = Math.max(60, Math.min(MAP_SIZE - 60, data.y));
+
+            players[socket.id].x = clampedX;
+            players[socket.id].y = clampedY;
             players[socket.id].angle = data.angle;
             players[socket.id].body = data.body;
             players[socket.id].color = data.color;
@@ -110,7 +113,6 @@ setInterval(() => {
         bot.x += Math.cos(bot.angle) * bot.speed;
         bot.y += Math.sin(bot.angle) * bot.speed;
 
-        // Mantém os bots dentro dos limites do mapa
         if (bot.x < 100 || bot.x > MAP_SIZE - 100) bot.angle = Math.PI - bot.angle;
         if (bot.y < 100 || bot.y > MAP_SIZE - 100) bot.angle = -bot.angle;
 
@@ -149,39 +151,23 @@ setInterval(() => {
         }
     }
 
-    // --- 5.3 Colisão PVP, Travas de Borda e Morte ---
+    // --- 5.3 Colisão PVP Segura e Sem Morte Fantasma ---
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
-
-        // Limite físico rígido para o player não vazar a tela
-        if (p.x < 50) p.x = 50;
-        if (p.x > MAP_SIZE - 50) p.x = MAP_SIZE - 50;
-        if (p.y < 50) p.y = 50;
-        if (p.y > MAP_SIZE - 50) p.y = MAP_SIZE - 50;
-
-        // Morte caso ultrapasse a zona limite da borda
-        if (p.x <= 35 || p.x >= MAP_SIZE - 35 || p.y <= 35 || p.y >= MAP_SIZE - 35) {
-            let finalScore = p.body.length;
-            p.body.forEach((pt, index) => {
-                if (index % 2 === 0) foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
-            });
-            io.to(pId).emit('player_died', { score: finalScore });
-            delete players[pId];
-            continue;
-        }
 
         let morreu = false;
         for (let oId in allEntities) {
             let target = allEntities[oId];
             if (!target || !target.body) continue;
 
-            // Ignora os primeiros 10 segmentos da própria cobra para evitar morte por colisão com o próprio corpo
-            let startIdx = (pId === oId) ? 10 : 0;
+            // CORREÇÃO CRÍTICA: Ignora os primeiros 18 segmentos da própria cobra para evitar colisão com o próprio corpo
+            let startIdx = (pId === oId) ? 18 : 0;
             
             for (let i = startIdx; i < target.body.length; i += 2) {
                 let part = target.body[i];
-                if (Math.abs(p.x - part.x) < 12 && Math.abs(p.y - part.y) < 12) {
+                // Hitbox rigorosa e justa de 10 pixels
+                if (Math.abs(p.x - part.x) < 10 && Math.abs(p.y - part.y) < 10) {
                     morreu = true;
                     break;
                 }
