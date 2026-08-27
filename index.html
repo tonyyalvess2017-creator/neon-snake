@@ -21,7 +21,7 @@
         <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
             <div>
                 <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (MUNDO LIVRE)</h1>
-                <p class="text-xs text-slate-400">A câmera agora segue a sua cobra pelo mapa gigante!</p>
+                <p class="text-xs text-slate-400">Comida inteligente próxima de você & Controles otimizados!</p>
             </div>
             <div class="flex gap-4">
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
@@ -69,36 +69,36 @@
 
         <!-- Rodapé -->
         <div class="flex justify-between w-full mt-3 text-xs text-slate-400 px-1">
-            <span>🕹️ Controles: Teclado (WASD) ou Controle Xbox (Analógico)</span>
+            <span>🕹️ Controles: Teclado (WASD / Setas) ou Controle Xbox (Analógico)</span>
             <span class="text-emerald-400 font-semibold">⚡ Servidor Online Ativo</span>
         </div>
     </div>
 
-    <!-- Lógica do Jogo com Câmera Dinâmica -->
+    <!-- Lógica do Jogo -->
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const moedasEl = document.getElementById("moedas");
         const tamanhoEl = document.getElementById("tamanho");
 
-        // Link oficial da sua Render configurado com sucesso!
         const socket = io("https://neon-snake-xzlj.onrender.com", {
             transports: ['websocket', 'polling']
         });
         
-        // Tamanho total do mapa do jogo (bem grande)
         const MAP_WIDTH = 2500;
         const MAP_HEIGHT = 2500;
 
-        let posX = Math.random() * 1000 + 500;
-        let posY = Math.random() * 1000 + 500;
+        let posX = 1250;
+        let posY = 1250;
         let direcao = "RIGHT";
+        let proximaDirecao = "RIGHT"; // Evita bugs de clique rápido
         let corpo = [];
         let comprimentoDesejado = 15;
         let moedasCount = 0;
         let minhaCor = "#06b6d4";
 
-        let comida = { x: Math.random() * MAP_WIDTH, y: Math.random() * MAP_HEIGHT, cor: "#f43f5e" };
+        // Comida inicial perto do jogador
+        let comida = { x: posX + 150, y: posY + 100, cor: "#f43f5e" };
         let outrosJogadores = {};
 
         function mudarSkin(corHex, custo) {
@@ -111,29 +111,38 @@
             }
         }
 
-        // Teclado
+        // Evento de Teclado
         window.addEventListener("keydown", (e) => {
-            if ((e.key === "ArrowUp" || e.key === "w") && direcao !== "DOWN") direcao = "UP";
-            if ((e.key === "ArrowDown" || e.key === "s") && direcao !== "UP") direcao = "DOWN";
-            if ((e.key === "ArrowLeft" || e.key === "a") && direcao !== "RIGHT") direcao = "LEFT";
-            if ((e.key === "ArrowRight" || e.key === "d") && direcao !== "LEFT") direcao = "RIGHT";
+            if ((e.key === "ArrowUp" || e.key === "w" || e.key === "W") && direcao !== "DOWN") proximaDirecao = "UP";
+            if ((e.key === "ArrowDown" || e.key === "s" || e.key === "S") && direcao !== "UP") proximaDirecao = "DOWN";
+            if ((e.key === "ArrowLeft" || e.key === "a" || e.key === "A") && direcao !== "RIGHT") proximaDirecao = "LEFT";
+            if ((e.key === "ArrowRight" || e.key === "d" || e.key === "D") && direcao !== "LEFT") proximaDirecao = "RIGHT";
         });
 
-        // Controle Xbox
+        // Suporte Otimizado para Controle Xbox (Gamepads)
         function lerControleXbox() {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             if (!gamepads[0]) return;
             const gp = gamepads[0];
+            
+            // Analógico esquerdo (eixos 0 e 1) com zona morta de 0.3 para evitar movimento fantasma
             const eixoX = gp.axes[0];
             const eixoY = gp.axes[1];
+            const deadzone = 0.3;
 
             if (Math.abs(eixoX) > Math.abs(eixoY)) {
-                if (eixoX > 0.5 && direcao !== "LEFT") direcao = "RIGHT";
-                else if (eixoX < -0.5 && direcao !== "RIGHT") direcao = "LEFT";
+                if (eixoX > deadzone && direcao !== "LEFT") proximaDirecao = "RIGHT";
+                else if (eixoX < -deadzone && direcao !== "RIGHT") proximaDirecao = "LEFT";
             } else {
-                if (eixoY > 0.5 && direcao !== "UP") direcao = "DOWN";
-                else if (eixoY < -0.5 && direcao !== "DOWN") direcao = "UP";
+                if (eixoY > deadzone && direcao !== "UP") proximaDirecao = "DOWN";
+                else if (eixoY < -deadzone && direcao !== "DOWN") proximaDirecao = "UP";
             }
+
+            // Suporte também ao D-Pad (Botões 12 a 15 no padrão Xbox)
+            if (gp.buttons[12] && gp.buttons[12].pressed && direcao !== "DOWN") proximaDirecao = "UP";
+            if (gp.buttons[13] && gp.buttons[13].pressed && direcao !== "UP") proximaDirecao = "DOWN";
+            if (gp.buttons[14] && gp.buttons[14].pressed && direcao !== "RIGHT") proximaDirecao = "LEFT";
+            if (gp.buttons[15] && gp.buttons[15].pressed && direcao !== "LEFT") proximaDirecao = "RIGHT";
         }
 
         socket.on("atualizar_arena", (dados) => {
@@ -142,13 +151,14 @@
 
         function atualizar() {
             lerControleXbox();
+            direcao = proximaDirecao;
 
-            if (direcao === "UP") posY -= 3;
-            if (direcao === "DOWN") posY += 3;
-            if (direcao === "LEFT") posX -= 3;
-            if (direcao === "RIGHT") posX += 3;
+            if (direcao === "UP") posY -= 3.5;
+            if (direcao === "DOWN") posY += 3.5;
+            if (direcao === "LEFT") posX -= 3.5;
+            if (direcao === "RIGHT") posX += 3.5;
 
-            // Limites do mapa gigante (borda sólida)
+            // Limites da Borda do Mapa
             if (posX < 20) posX = 20;
             if (posX > MAP_WIDTH - 20) posX = MAP_WIDTH - 20;
             if (posY < 20) posY = 20;
@@ -161,17 +171,20 @@
 
             tamanhoEl.innerText = corpo.length;
 
-            // Comer Comida
+            // Sistema de Comida Inteligente (Gera sempre próximo ao jogador)
             let distanciaComida = Math.hypot(posX - comida.x, posY - comida.y);
-            if (distanciaComida < 20) {
+            if (distanciaComida < 25) {
                 comprimentoDesejado += 4;
                 moedasCount += 1;
                 moedasEl.innerText = moedasCount;
-                comida.x = Math.random() * (MAP_WIDTH - 100) + 50;
-                comida.y = Math.random() * (MAP_HEIGHT - 100) + 50;
+
+                // Nova comida nasce a uma distância segura ao redor do jogador
+                let angulo = Math.random() * Math.PI * 2;
+                let distancia = Math.random() * 250 + 80;
+                comida.x = Math.max(50, Math.min(MAP_WIDTH - 50, posX + Math.cos(angulo) * distancia));
+                comida.y = Math.max(50, Math.min(MAP_HEIGHT - 50, posY + Math.sin(angulo) * distancia));
             }
 
-            // Envia os dados sincronizando com o servidor
             socket.emit("player_sync", { x: posX, y: posY, corpo: corpo, cor: minhaCor });
         }
 
@@ -185,7 +198,7 @@
             ctx.save();
             ctx.translate(-camX, -camY);
 
-            // Desenhar Grade do Mundo Gigante
+            // Grade do Mundo
             ctx.strokeStyle = "#0f172a";
             ctx.lineWidth = 1;
             for (let i = 0; i <= MAP_WIDTH; i += 80) {
@@ -195,20 +208,20 @@
                 ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(MAP_WIDTH, j); ctx.stroke();
             }
 
-            // Bordas do Mapa
+            // Bordas
             ctx.strokeStyle = "#ef4444";
             ctx.lineWidth = 4;
             ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-            // Desenhar Comida
-            ctx.shadowBlur = 15;
+            // Desenhar Comida (Bolinha com brilho neon)
+            ctx.shadowBlur = 18;
             ctx.shadowColor = comida.cor;
             ctx.fillStyle = comida.cor;
             ctx.beginPath();
             ctx.arc(comida.x, comida.y, 8, 0, Math.PI * 2);
             ctx.fill();
 
-            // Desenhar Outros Jogadores Online
+            // Desenhar Outros Jogadores
             for (let id in outrosJogadores) {
                 let p = outrosJogadores[id];
                 let corOutro = p.cor || "#f43f5e";
@@ -221,7 +234,7 @@
                 }
             }
 
-            ctx.restore(); 
+            ctx.restore();
         }
 
         function loop() {
