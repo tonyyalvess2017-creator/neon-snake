@@ -81,8 +81,8 @@
         const moedasEl = document.getElementById("moedas");
         const tamanhoEl = document.getElementById("tamanho");
 
-        // ⚠️ SUBSTITUA COM A URL DO SEU RENDER/GLITCH:
-        const socket = io("https://SEU-LINK-AQUI.onrender.com", {
+        // Link oficial da sua Render configurado com sucesso!
+        const socket = io("https://neon-snake-xzlj.onrender.com", {
             transports: ['websocket', 'polling']
         });
         
@@ -171,7 +171,7 @@
                 comida.y = Math.random() * (MAP_HEIGHT - 100) + 50;
             }
 
-            // Envia os dados sincronizando com o servidor (o servidor vai injetar o socket.id correto)
+            // Envia os dados sincronizando com o servidor
             socket.emit("player_sync", { x: posX, y: posY, corpo: corpo, cor: minhaCor });
         }
 
@@ -208,7 +208,7 @@
             ctx.arc(comida.x, comida.y, 8, 0, Math.PI * 2);
             ctx.fill();
 
-            // Desenhar Outros Jogadores Online (Excluindo a si mesmo pelo socket.id se necessário, ou exibindo todos vindos do server)
+            // Desenhar Outros Jogadores Online
             for (let id in outrosJogadores) {
                 let p = outrosJogadores[id];
                 let corOutro = p.cor || "#f43f5e";
