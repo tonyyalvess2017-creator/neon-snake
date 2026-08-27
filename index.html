@@ -3,176 +3,242 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slither.io - Phaser Engine Pro</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <title>Slither.io - Enterprise Engine</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { background: #010105; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        canvas { box-shadow: 0 0 100px rgba(0,0,0,0.95); }
+        * { box-sizing: border-box; }
+        body { background: #020208; color: #fff; margin: 0; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
+        canvas { display: block; background: #050510; cursor: crosshair; }
+        #hud {
+            position: fixed; top: 20px; left: 20px;
+            background: rgba(5, 5, 15, 0.85); border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 20px; border-radius: 12px; backdrop-filter: blur(10px);
+            display: flex; gap: 20px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .hud-item span { color: #00f0ff; font-weight: 700; }
     </style>
 </head>
 <body>
 
+    <div id="hud">
+        <div class="hud-item">STATUS: <span id="net-status" style="color: #fbbf24;">Conectando...</span></div>
+        <div style="width: 1px; height: 15px; background: rgba(255,255,255,0.1);"></div>
+        <div class="hud-item">COMPRIMENTO: <span id="score-val">30</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
     <script>
-        const socket = io("https://neon-snake-xzlj.onrender.com");
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score-val");
+        const statusEl = document.getElementById("net-status");
 
-        class GameScene extends Phaser.Scene {
-            constructor() {
-                super('GameScene');
-            }
-
-            create() {
-                this.cameras.main.setBackgroundColor('#03030b');
-                this.worldSize = 5000;
-
-                this.graphics = this.add.graphics();
-                this.drawGrid();
-
-                this.myColor = ['#00f0ff', '#ff0055', '#ffe600', '#a855f7'][Math.floor(Math.random() * 4)];
-                this.snakeBody = [];
-                this.score = 30;
-
-                for (let i = 0; i < 35; i++) {
-                    this.snakeBody.push({ x: 2500, y: 2500 + (i * 4) });
-                }
-
-                socket.emit('join_game', { x: 2500, y: 2500, body: this.snakeBody, color: this.myColor });
-                this.otherPlayers = {};
-
-                socket.on('server_tick', (data) => {
-                    this.otherPlayers = data.players;
-                });
-
-                this.cameras.main.setBounds(0, 0, this.worldSize, this.worldSize);
-            }
-
-            drawGrid() {
-                this.graphics.lineStyle(1, 0x0d0d22, 1);
-                for (let x = 0; x <= this.worldSize; x += 150) {
-                    this.graphics.beginPath();
-                    this.graphics.moveTo(x, 0);
-                    this.graphics.lineTo(x, this.worldSize);
-                    this.graphics.strokePath();
-                }
-                for (let y = 0; y <= this.worldSize; y += 150) {
-                    this.graphics.beginPath();
-                    this.graphics.moveTo(0, y);
-                    this.graphics.lineTo(this.worldSize, y);
-                    this.graphics.strokePath();
-                }
-
-                this.graphics.lineStyle(6, 0xff0055, 1);
-                this.graphics.strokeRect(0, 0, this.worldSize, this.worldSize);
-            }
-
-            update(time, delta) {
-                const pointer = this.input.activePointer;
-                const cam = this.cameras.main;
-                
-                const worldMouseX = pointer.x + cam.scrollX;
-                const worldMouseY = pointer.y + cam.scrollY;
-
-                let head = this.snakeBody[0];
-                let angle = Math.atan2(worldMouseY - head.y, worldMouseX - head.x);
-                let speed = 4;
-
-                head.x += Math.cos(angle) * speed;
-                head.y += Math.sin(angle) * speed;
-
-                head.x = Phaser.Math.Clamp(head.x, 30, this.worldSize - 30);
-                head.y = Phaser.Math.Clamp(head.y, 30, this.worldSize - 30);
-
-                let targetX = head.x;
-                let targetY = head.y;
-                for (let i = 1; i < this.snakeBody.length; i++) {
-                    let part = this.snakeBody[i];
-                    let dx = targetX - part.x;
-                    let dy = targetY - part.y;
-                    let dist = Math.hypot(dx, dy);
-
-                    if (dist > 12) {
-                        let a = Math.atan2(dy, dx);
-                        part.x = targetX - Math.cos(a) * 12;
-                        part.y = targetY - Math.sin(a) * 12;
-                    }
-                    targetX = part.x;
-                    targetY = part.y;
-                }
-
-                cam.centerOn(head.x, head.y);
-
-                socket.emit('player_update', {
-                    x: head.x,
-                    y: head.y,
-                    angle: angle,
-                    score: this.score,
-                    body: this.snakeBody
-                });
-
-                this.renderGame(angle);
-            }
-
-            renderGame(angle) {
-                if (!this.myGraphics) {
-                    this.myGraphics = this.add.graphics();
-                }
-                this.myGraphics.clear();
-
-                // Desenha o corpo do jogador fluido
-                for (let i = this.snakeBody.length - 1; i >= 0; i--) {
-                    let p = this.snakeBody[i];
-                    let radius = Math.max(8, 15 - (i * 0.08));
-                    this.myGraphics.fillStyle(Phaser.Display.Color.HexStringToColor(this.myColor).color, 1);
-                    this.myGraphics.fillCircle(p.x, p.y, radius);
-                }
-
-                // Cabeça
-                let head = this.snakeBody[0];
-                this.myGraphics.fillStyle(Phaser.Display.Color.HexStringToColor(this.myColor).color, 1);
-                this.myGraphics.fillCircle(head.x, head.y, 16);
-
-                // Olhos dinâmicos
-                let d = 7;
-                let o1x = head.x + Math.cos(angle - 0.55) * d;
-                let o1y = head.y + Math.sin(angle - 0.55) * d;
-                let o2x = head.x + Math.cos(angle + 0.55) * d;
-                let o2y = head.y + Math.sin(angle + 0.55) * d;
-
-                this.myGraphics.fillStyle(0xffffff, 1);
-                this.myGraphics.fillCircle(o1x, o1y, 4);
-                this.myGraphics.fillCircle(o2x, o2y, 4);
-
-                this.myGraphics.fillStyle(0x010105, 1);
-                this.myGraphics.fillCircle(o1x + Math.cos(angle)*1.5, o1y + Math.sin(angle)*1.5, 1.8);
-                this.myGraphics.fillCircle(o2x + Math.cos(angle)*1.5, o2y + Math.sin(angle)*1.5, 1.8);
-
-                // Renderiza outros jogadores conectados
-                for (let id in this.otherPlayers) {
-                    if (id === socket.id) continue;
-                    let p = this.otherPlayers[id];
-                    if (p && p.body) {
-                        for (let part of p.body) {
-                            this.myGraphics.fillStyle(Phaser.Display.Color.HexStringToColor(p.color || '#ff0055').color, 1);
-                            this.myGraphics.fillCircle(part.x, part.y, 14);
-                        }
-                    }
-                }
-            }
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-        const config = {
-            type: Phaser.AUTO,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            physics: { default: 'arcade' },
-            scene: [GameScene]
+        const socket = io("https://neon-snake-xzlj.onrender.com", {
+            transports: ['websocket', 'polling']
+        });
+
+        socket.on("connect", () => {
+            statusEl.innerText = "Online";
+            statusEl.style.color = "#34d399";
+        });
+
+        socket.on("disconnect", () => {
+            statusEl.innerText = "Desconectado";
+            statusEl.style.color = "#f87171";
+        });
+
+        const MAP_SIZE = 6000;
+        const colorsList = ['#00f0ff', '#ff0055', '#ffe600', '#a855f7', '#00ff66'];
+        const myColor = colorsList[Math.floor(Math.random() * colorsList.length)];
+
+        let snake = {
+            x: MAP_SIZE / 2 + (Math.random() * 400 - 200),
+            y: MAP_SIZE / 2 + (Math.random() * 400 - 200),
+            angle: 0,
+            speed: 3.8,
+            radius: 14,
+            body: []
         };
 
-        const game = new Phaser.Game(config);
+        const LINK_DIST = 11;
+        for (let i = 0; i < 30; i++) {
+            snake.body.push({ x: snake.x, y: snake.y + (i * 4) });
+        }
 
-        window.addEventListener('resize', () => {
-            game.scale.resize(window.innerWidth, window.innerHeight);
+        socket.emit('player_join', { x: snake.x, y: snake.y, body: snake.body, color: myColor });
+
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let serverData = { players: {}, foods: [] };
+
+        window.addEventListener("mousemove", (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
         });
+
+        socket.on('server_update', (data) => {
+            serverData = data;
+        });
+
+        function update() {
+            // Conversão de coordenadas da tela para o mundo considerando o centro da câmera
+            const worldMouseX = mouseX - canvas.width / 2 + snake.x;
+            const worldMouseY = mouseY - canvas.height / 2 + snake.y;
+
+            let targetAngle = Math.atan2(worldMouseY - snake.y, worldMouseX - snake.x);
+            let diff = targetAngle - snake.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            snake.angle += diff * 0.12;
+
+            snake.x += Math.cos(snake.angle) * snake.speed;
+            snake.y += Math.sin(snake.angle) * snake.speed;
+
+            // Restrições de borda do mapa
+            snake.x = Math.max(30, Math.min(MAP_SIZE - 30, snake.x));
+            snake.y = Math.max(30, Math.min(MAP_SIZE - 30, snake.y));
+
+            // Física de elos elásticos do corpo
+            let targetX = snake.x;
+            let targetY = snake.y;
+            for (let i = 0; i < snake.body.length; i++) {
+                let part = snake.body[i];
+                let dx = targetX - part.x;
+                let dy = targetY - part.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist > LINK_DIST) {
+                    let ang = Math.atan2(dy, dx);
+                    part.x = targetX - Math.cos(ang) * LINK_DIST;
+                    part.y = targetY - Math.sin(ang) * LINK_DIST;
+                }
+                targetX = part.x;
+                targetY = part.y;
+            }
+
+            // Sincronização periódica com o backend
+            socket.emit('player_sync', {
+                x: snake.x,
+                y: snake.y,
+                angle: snake.angle,
+                score: snake.body.length,
+                body: snake.body
+            });
+        }
+
+        function draw() {
+            ctx.fillStyle = "#050510";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            // Câmera centrada no jogador
+            ctx.translate(canvas.width / 2 - snake.x, canvas.height / 2 - snake.y);
+
+            // Renderização da grade do mapa com alta performance
+            ctx.strokeStyle = "#0e0e24";
+            ctx.lineWidth = 1.5;
+            for (let x = 0; x <= MAP_SIZE; x += 200) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); ctx.stroke();
+            }
+            for (let y = 0; y <= MAP_SIZE; y += 200) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); ctx.stroke();
+            }
+
+            // Borda delimitadora do mapa
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = "#ff0055";
+            ctx.strokeStyle = "#ff0055";
+            ctx.lineWidth = 8;
+            ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+            ctx.shadowBlur = 0;
+
+            // Renderização de Comida / Orbes do Servidor
+            if (serverData.foods) {
+                for (let f of serverData.foods) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = f.color;
+                    ctx.fillStyle = f.color;
+                    ctx.beginPath();
+                    ctx.arc(f.x, f.y, 4.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
+            }
+
+            // Renderização de Outros Jogadores
+            for (let id in serverData.players) {
+                if (id === socket.id) continue;
+                let p = serverData.players[id];
+                if (p && p.body) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = p.color || '#ff0055';
+                    ctx.fillStyle = p.color || '#ff0055';
+                    for (let part of p.body) {
+                        ctx.beginPath();
+                        ctx.arc(part.x, part.y, 13, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+            ctx.shadowBlur = 0;
+
+            // Renderização do Corpo do Jogador Local
+            for (let i = snake.body.length - 1; i >= 0; i--) {
+                let part = snake.body[i];
+                let radius = Math.max(8, snake.radius - (i * 0.05));
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = myColor;
+                ctx.fillStyle = myColor;
+                ctx.beginPath();
+                ctx.arc(part.x, part.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // Cabeça detalhada com olhos dinâmicos direcionais
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = myColor;
+            ctx.fillStyle = myColor;
+            ctx.beginPath();
+            ctx.arc(snake.x, snake.y, snake.radius + 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Olhos
+            let eyeOffset = 7;
+            let e1x = snake.x + Math.cos(snake.angle - 0.55) * eyeOffset;
+            let e1y = snake.y + Math.sin(snake.angle - 0.55) * eyeOffset;
+            let e2x = snake.x + Math.cos(snake.angle + 0.55) * eyeOffset;
+            let e2y = snake.y + Math.sin(snake.angle + 0.55) * eyeOffset;
+
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath(); ctx.arc(e1x, e1y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(e2x, e2y, 4, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = "#020208";
+            ctx.beginPath(); ctx.arc(e1x + Math.cos(snake.angle)*1.5, e1y + Math.sin(snake.angle)*1.5, 1.8, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(e2x + Math.cos(snake.angle)*1.5, e2y + Math.sin(snake.angle)*1.5, 1.8, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+
+            scoreEl.innerText = snake.body.length;
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
     </script>
 </body>
 </html>
