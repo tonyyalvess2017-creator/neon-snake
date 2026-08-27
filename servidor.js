@@ -32,7 +32,7 @@ for (let i = 0; i < 1500; i++) {
 // ==========================================
 // 3. SISTEMA DE BOTS (IA)
 // ==========================================
-const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
+const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster","Gabriel"];
 
 for (let i = 0; i < 15; i++) { // Reduzido levemente para garantir fluidez máxima
     spawnBot(`bot_${i}`, botNames[i % botNames.length]);
