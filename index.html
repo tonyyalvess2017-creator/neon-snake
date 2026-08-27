@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Snake Arena - Mundo Infinito & PvP</title>
+    <title>Neon Snake Arena - Mundo Infinito & PvP (Cobra.io Style)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Socket.io -->
@@ -20,8 +20,8 @@
         <!-- Header -->
         <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
             <div>
-                <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (MUNDO LIVRE)</h1>
-                <p class="text-xs text-slate-400">Modo Clássico Perfeito: Controles sem conflito e crescimento fluído!</p>
+                <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (COBRA.IO)</h1>
+                <p class="text-xs text-slate-400">Colete as orbes de massa espalhadas pelo mapa para crescer!</p>
             </div>
             <div class="flex gap-4">
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- Lógica Definitiva do Jogo -->
+    <!-- Lógica Atualizada (Orbes Estilo Cobra.io) -->
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -99,14 +99,28 @@
         
         let dx = GRID_SIZE;
         let dy = 0;
-        let proximaDirecao = { dx: GRID_SIZE, dy: 0 }; // Buffer de segurança para evitar bugs de input
-        let controleNeutro = true; // Impede repetição fantasma do analógico
+        let proximaDirecao = { dx: GRID_SIZE, dy: 0 };
+        let controleNeutro = true;
 
         let moedasCount = 0;
         let minhaCor = "#06b6d4";
-
-        let comida = { x: 1350, y: 1250, cor: "#f43f5e" };
         let outrosJogadores = {};
+
+        // Geração de centenas de orbes de massa espalhadas pelo mapa (Estilo Slither/Cobra.io)
+        let orbesMassa = [];
+        const TOTAL_ORBES = 300;
+        const coresOrbes = ["#f43f5e", "#eab308", "#06b6d4", "#a855f7", "#22c55e", "#ec4899"];
+
+        function gerarOrbesIniciais() {
+            for (let i = 0; i < TOTAL_ORBES; i++) {
+                orbesMassa.push({
+                    x: Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE,
+                    y: Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE,
+                    cor: coresOrbes[Math.floor(Math.random() * coresOrbes.length)]
+                });
+            }
+        }
+        gerarOrbesIniciais();
 
         function mudarSkin(corHex, custo) {
             if (moedasCount >= custo) {
@@ -118,15 +132,13 @@
             }
         }
 
-        // Função segura para mudar direção sem quebrar as regras da cobrinha
         function mudarDirecao(novoDx, novoDy) {
-            // Impede a cobra de voltar direto para dentro do próprio pescoço
             if (novoDx !== -dx || novoDy !== -dy) {
                 proximaDirecao = { dx: novoDx, dy: novoDy };
             }
         }
 
-        // Eventos de Teclado
+        // Teclado
         window.addEventListener("keydown", (e) => {
             const key = e.key;
             if (key === "ArrowUp" || key === "w" || key === "W") mudarDirecao(0, -GRID_SIZE);
@@ -135,7 +147,7 @@
             if (key === "ArrowRight" || key === "d" || key === "D") mudarDirecao(GRID_SIZE, 0);
         });
 
-        // Leitura de Controle Xbox com trava de neutro (evita travamentos)
+        // Controle Xbox
         function lerControleXbox() {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             if (!gamepads[0]) return;
@@ -143,10 +155,10 @@
             
             const eixoX = gp.axes[0];
             const eixoY = gp.axes[1];
-            const deadzone = 0.5; // Zona morta maior para evitar qualquer toque acidental
+            const deadzone = 0.5;
 
             if (Math.abs(eixoX) < deadzone && Math.abs(eixoY) < deadzone) {
-                controleNeutro = true; // Liberado para o próximo comando
+                controleNeutro = true;
             }
 
             if (controleNeutro && (Math.abs(eixoX) > deadzone || Math.abs(eixoY) > deadzone)) {
@@ -160,7 +172,6 @@
                 controleNeutro = false;
             }
 
-            // D-Pad do Xbox (Botões direcionais)
             if (gp.buttons[12] && gp.buttons[12].pressed) mudarDirecao(0, -GRID_SIZE);
             if (gp.buttons[13] && gp.buttons[13].pressed) mudarDirecao(0, GRID_SIZE);
             if (gp.buttons[14] && gp.buttons[14].pressed) mudarDirecao(-GRID_SIZE, 0);
@@ -174,13 +185,11 @@
         function atualizar() {
             lerControleXbox();
 
-            // Aplica a direção armazenada no buffer com segurança
             dx = proximaDirecao.dx;
             dy = proximaDirecao.dy;
 
             const cabeca = { x: snake[0].x + dx, y: snake[0].y + dy };
 
-            // Limites das bordas do mapa gigante
             if (cabeca.x < 0) cabeca.x = MAP_WIDTH - GRID_SIZE;
             if (cabeca.x >= MAP_WIDTH) cabeca.x = 0;
             if (cabeca.y < 0) cabeca.y = MAP_HEIGHT - GRID_SIZE;
@@ -188,23 +197,29 @@
 
             snake.unshift(cabeca);
 
-            // Verificar se comeu a comida
-            let comeu = Math.abs(cabeca.x - comida.x) < GRID_SIZE && Math.abs(cabeca.y - comida.y) < GRID_SIZE;
-            if (comeu) {
-                moedasCount += 1;
-                moedasEl.innerText = moedasCount;
-                tamanhoEl.innerText = snake.length;
+            // Verificar colisão com as várias orbes de massa espalhadas
+            let comeuOrbe = false;
+            for (let i = orbesMassa.length - 1; i >= 0; i--) {
+                let o = orbesMassa[i];
+                if (Math.abs(cabeca.x - o.x) < GRID_SIZE && Math.abs(cabeca.y - o.y) < GRID_SIZE) {
+                    comeuOrbe = true;
+                    moedasCount += 1;
+                    moedasEl.innerText = moedasCount;
 
-                // Reposicionar comida alinhada ao grid
-                comida.x = Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE;
-                comida.y = Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE;
-            } else {
-                snake.pop(); // Remove a cauda se não comeu (crescimento correto)
+                    // Reposiciona a orbe comida em outro lugar aleatório do mapa (Mantém o fluxo constante)
+                    orbesMassa[i].x = Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE;
+                    orbesMassa[i].y = Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE;
+                    orbesMassa[i].cor = coresOrbes[Math.floor(Math.random() * coresOrbes.length)];
+                    break; // Come uma por vez por frame
+                }
+            }
+
+            if (!comeuOrbe) {
+                snake.pop(); // Mantém o tamanho se não comeu
             }
 
             tamanhoEl.innerText = snake.length;
 
-            // Sincronizar dados com o servidor online
             socket.emit("player_sync", { x: cabeca.x, y: cabeca.y, corpo: snake, cor: minhaCor });
         }
 
@@ -234,15 +249,18 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-            // Desenhar Comida
-            ctx.shadowBlur = 18;
-            ctx.shadowColor = comida.cor;
-            ctx.fillStyle = comida.cor;
-            ctx.beginPath();
-            ctx.arc(comida.x + GRID_SIZE/2, comida.y + GRID_SIZE/2, 8, 0, Math.PI * 2);
-            ctx.fill();
+            // Desenhar todas as Orbes de Massa (Estilo Cobra.io)
+            for (let o of orbesMassa) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = o.cor;
+                ctx.fillStyle = o.cor;
+                ctx.beginPath();
+                ctx.arc(o.x + GRID_SIZE/2, o.y + GRID_SIZE/2, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             // Desenhar Minha Cobra
+            ctx.shadowBlur = 15;
             ctx.shadowColor = minhaCor;
             ctx.fillStyle = minhaCor;
             for (let parte of snake) {
@@ -265,9 +283,8 @@
             ctx.restore();
         }
 
-        // Game Loop Clássico Estável (Velocidade ajustada de passo a passo)
         let ultimoTempo = 0;
-        const velocidadeJogo = 100; // Milissegundos por movimento da cobra
+        const velocidadeJogo = 100;
 
         function loop(tempoAtual) {
             if (!ultimoTempo) ultimoTempo = tempoAtual;
