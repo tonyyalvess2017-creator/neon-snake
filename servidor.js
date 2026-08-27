@@ -17,9 +17,8 @@ app.use(express.static(__dirname));
 let players = {}; 
 let bots = {};    
 let foods = [];   
-const MAP_SIZE = 6000; // Tamanho total do mapa em pixels
+const MAP_SIZE = 6000; // Tamanho do mapa
 
-// Gera a comida inicial espalhada pelo mapa
 for (let i = 0; i < 1500; i++) {
     foods.push({
         id: i,
@@ -30,7 +29,7 @@ for (let i = 0; i < 1500; i++) {
 }
 
 // ==========================================
-// 3. SISTEMA DE BOTS COM NOMES PERSONALIZADOS
+// 3. SISTEMA DE BOTS (IA) COM NOMES PERSONALIZADOS
 // ==========================================
 const botNames = ["Bernardo", "Gabriel", "Lucas", "Igor", "Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
 
@@ -61,7 +60,7 @@ function spawnBot(id, name) {
 }
 
 // ==========================================
-// 4. CONEXÕES DOS JOGADORES E SINCRONIZAÇÃO BLINDADA
+// 4. CONEXÕES DOS JOGADORES (COM BLINDAGEM DE BORDA)
 // ==========================================
 io.on('connection', (socket) => {
     socket.on('player_join', (data) => {
@@ -76,9 +75,9 @@ io.on('connection', (socket) => {
         };
     });
 
-    // BLINDAGEM DA BORDA NO SERVIDOR: Impede que o cliente envie posições ilegais para fora do mapa
     socket.on('player_sync', (data) => {
         if (players[socket.id]) {
+            // Trava rígida para impedir que o cliente ultrapasse o limite do mapa
             let clampedX = Math.max(60, Math.min(MAP_SIZE - 60, data.x));
             let clampedY = Math.max(60, Math.min(MAP_SIZE - 60, data.y));
 
@@ -101,7 +100,7 @@ io.on('connection', (socket) => {
 // ==========================================
 setInterval(() => {
     
-    // --- 5.1 Movimentação e IA dos Bots ---
+    // --- 5.1 Movimentação dos Bots ---
     for (let id in bots) {
         let bot = bots[id];
         bot.changeTimer++;
@@ -151,7 +150,7 @@ setInterval(() => {
         }
     }
 
-    // --- 5.3 Colisão PVP Segura e Sem Morte Fantasma ---
+    // --- 5.3 Colisão PVP Limpa (Com folga de 18 partes para zerar morte fantasma) ---
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
@@ -161,12 +160,11 @@ setInterval(() => {
             let target = allEntities[oId];
             if (!target || !target.body) continue;
 
-            // CORREÇÃO CRÍTICA: Ignora os primeiros 18 segmentos da própria cobra para evitar colisão com o próprio corpo
+            // Ignora os primeiros 18 segmentos do próprio corpo para evitar colisão ao fazer curvas
             let startIdx = (pId === oId) ? 18 : 0;
             
             for (let i = startIdx; i < target.body.length; i += 2) {
                 let part = target.body[i];
-                // Hitbox rigorosa e justa de 10 pixels
                 if (Math.abs(p.x - part.x) < 10 && Math.abs(p.y - part.y) < 10) {
                     morreu = true;
                     break;
@@ -187,13 +185,12 @@ setInterval(() => {
         }
     }
 
-    // --- 5.4 Sincronização Geral ---
     io.emit('server_update', { players, bots, foods });
 
 }, 1000 / 60);
 
 // ==========================================
-// 6. INICIALIZAÇÃO DO SERVIDOR
+// 6. INICIALIZAÇÃO
 // ==========================================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
