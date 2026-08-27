@@ -14,7 +14,7 @@ let foods = [];
 const MAP_SIZE = 6000;
 
 // Gera comida inicial
-for (let i = 0; i < 1500; i++) {
+for (let i = 0; i < 2000; i++) {
     foods.push({
         id: i,
         x: Math.random() * MAP_SIZE,
@@ -23,26 +23,27 @@ for (let i = 0; i < 1500; i++) {
     });
 }
 
-// Cria Bots Inteligentes na Arena
 const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
-for (let i = 0; i < 15; i++) {
-    let bId = `bot_${i}`;
-    let bX = Math.random() * MAP_SIZE;
-    let bY = Math.random() * MAP_SIZE;
+for (let i = 0; i < 20; i++) {
+    spawnBot(`bot_${i}`, botNames[i % botNames.length]);
+}
+
+function spawnBot(id, name) {
+    let bX = Math.random() * (MAP_SIZE - 1000) + 500;
+    let bY = Math.random() * (MAP_SIZE - 1000) + 500;
     let bBody = [];
-    for (let j = 0; j < 30; j++) {
+    for (let j = 0; j < 35; j++) {
         bBody.push({ x: bX, y: bY + (j * 4) });
     }
-    bots[bId] = {
-        id: bId,
-        name: botNames[i % botNames.length],
+    bots[id] = {
+        id: id,
+        name: name,
         x: bX,
         y: bY,
         angle: Math.random() * Math.PI * 2,
         speed: 3.5,
-        score: 30,
         body: bBody,
-        color: ['#ff0055', '#ffe600', '#a855f7', '#00ff66'][Math.floor(Math.random() * 4)],
+        color: ['#ff0055', '#ffe600', '#a855f7', '#00ff66', '#00f0ff'][Math.floor(Math.random() * 5)],
         changeTimer: 0
     };
 }
@@ -57,7 +58,6 @@ io.on('connection', (socket) => {
             x: data.x,
             y: data.y,
             angle: 0,
-            score: 30,
             body: data.body || [],
             color: data.color || '#00f0ff'
         };
@@ -68,8 +68,9 @@ io.on('connection', (socket) => {
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
             players[socket.id].angle = data.angle;
-            players[socket.id].score = data.score;
             players[socket.id].body = data.body;
+            players[socket.id].color = data.color;
+            players[socket.id].name = data.name;
         }
     });
 
@@ -78,26 +79,22 @@ io.on('connection', (socket) => {
     });
 });
 
-// Loop principal de atualização de Bots e Estado Global (60 FPS)
+// Loop principal de lógica do servidor
 setInterval(() => {
-    // Atualiza IA dos Bots
+    // 1. Atualiza Bots com IA fluida
     for (let id in bots) {
         let bot = bots[id];
         bot.changeTimer++;
-        if (bot.changeTimer > 120) {
-            bot.angle += (Math.random() - 0.5) * 2;
+        if (bot.changeTimer > 90) {
+            bot.angle += (Math.random() - 0.5) * 2.5;
             bot.changeTimer = 0;
         }
 
         bot.x += Math.cos(bot.angle) * bot.speed;
         bot.y += Math.sin(bot.angle) * bot.speed;
 
-        // Limites do mapa
-        if (bot.x < 50 || bot.x > MAP_SIZE - 50) bot.angle = Math.PI - bot.angle;
-        if (bot.y < 50 || bot.y > MAP_SIZE - 50) bot.angle = -bot.angle;
-
-        bot.x = Math.max(30, Math.min(MAP_SIZE - 30, bot.x));
-        bot.y = Math.max(30, Math.min(MAP_SIZE - 30, bot.y));
+        if (bot.x < 100 || bot.x > MAP_SIZE - 100) bot.angle = Math.PI - bot.angle;
+        if (bot.y < 100 || bot.y > MAP_SIZE - 100) bot.angle = -bot.angle;
 
         let targetX = bot.x;
         let targetY = bot.y;
@@ -113,6 +110,65 @@ setInterval(() => {
             }
             targetX = part.x;
             targetY = part.y;
+        }
+    }
+
+    // 2. Checagem de Colisão (Morte e Comida)
+    let allEntities = { ...players, ...bots };
+
+    // Come comida (Players e Bots)
+    for (let id in allEntities) {
+        let entity = allEntities[id];
+        if (!entity || !entity.body) continue;
+
+        for (let i = foods.length - 1; i >= 0; i--) {
+            let f = foods[i];
+            let dist = Math.hypot(entity.x - f.x, entity.y - f.y);
+            if (dist < 20) {
+                // Cresce adicionando partes ao corpo
+                let tail = entity.body[entity.body.length - 1];
+                entity.body.push({ x: tail.x, y: tail.y });
+                // Reposiciona a comida comida
+                foods[i].x = Math.random() * MAP_SIZE;
+                foods[i].y = Math.random() * MAP_SIZE;
+            }
+        }
+    }
+
+    // Colisão entre cabeças e corpos (Morte)
+    for (let pId in players) {
+        let p = players[pId];
+        if (!p || !p.body) continue;
+
+        // Bateu nas bordas do mapa
+        if (p.x <= 30 || p.x >= MAP_SIZE - 30 || p.y <= 30 || p.y >= MAP_SIZE - 30) {
+            io.to(pId).emit('player_died');
+            delete players[pId];
+            continue;
+        }
+
+        // Bateu em outros corpos (inclusive o próprio)
+        for (let oId in allEntities) {
+            let target = allEntities[oId];
+            if (!target || !target.body) continue;
+
+            let startIdx = (pId === oId) ? 5 : 0; // Ignora o próprio pescoço imediato
+            for (let i = startIdx; i < target.body.length; i++) {
+                let part = target.body[i];
+                let dist = Math.hypot(p.x - part.x, p.y - part.y);
+                if (dist < 14) {
+                    // Morreu! Transforma o corpo em comida
+                    p.body.forEach((pt, index) => {
+                        if (index % 2 === 0) {
+                            foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
+                        }
+                    });
+                    io.to(pId).emit('player_died');
+                    delete players[pId];
+                    break;
+                }
+            }
+            if (!players[pId]) break;
         }
     }
 
