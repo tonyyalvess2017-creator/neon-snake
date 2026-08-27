@@ -18,22 +18,42 @@
         #gameover-overlay { display: none; }
         .menu-card {
             background: rgba(10, 10, 25, 0.95); border: 1px solid rgba(255,255,255,0.15);
-            padding: 35px; border-radius: 20px; width: 400px; text-align: center;
+            padding: 30px; border-radius: 20px; width: 420px; text-align: center;
             box-shadow: 0 20px 50px rgba(0,0,0,0.9);
         }
-        .menu-card h1 { color: #fff; font-size: 26px; margin-bottom: 20px; letter-spacing: 2px; }
+        .menu-card h1 { color: #fff; font-size: 24px; margin-bottom: 15px; letter-spacing: 2px; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            color: #aaa; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .tab-btn.active { background: #00f0ff; color: #020208; border-color: #00f0ff; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
         .menu-input {
             width: 100%; padding: 12px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
             border-radius: 10px; color: #fff; font-size: 15px; margin-bottom: 15px; outline: none; text-align: center;
         }
-        .skin-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
-        .skin-ball {
-            width: 45px; height: 45px; border-radius: 12px; cursor: pointer; border: 2px solid rgba(255,255,255,0.1);
-            transition: transform 0.2s; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; font-weight: bold;
-        }
-        .skin-ball:hover { transform: scale(1.1); }
-        .skin-ball.selected { border-color: #00f0ff; transform: scale(1.15); box-shadow: 0 0 15px #00f0ff; }
         
+        .skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 220px; overflow-y: auto; margin-bottom: 15px; padding-right: 5px; }
+        .skin-item {
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+            padding: 10px; cursor: pointer; text-align: center; transition: 0.2s; position: relative;
+        }
+        .skin-item:hover { border-color: #00f0ff; transform: scale(1.03); }
+        .skin-item.selected { border-color: #00f0ff; box-shadow: 0 0 12px #00f0ff; }
+        .skin-preview { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 6px auto; }
+        .skin-name { font-size: 11px; color: #fff; }
+        .skin-price { font-size: 10px; color: #ffe600; margin-top: 3px; }
+
+        .coin-display {
+            background: rgba(255, 230, 0, 0.1); border: 1px solid rgba(255, 230, 0, 0.3);
+            padding: 8px; border-radius: 8px; color: #ffe600; font-weight: bold; font-size: 14px; margin-bottom: 15px;
+        }
+
         .btn-play {
             width: 100%; padding: 14px; background: linear-gradient(135deg, #00f0ff, #0077ff);
             border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 700;
@@ -61,25 +81,30 @@
 </head>
 <body>
 
-    <!-- Menu Principal com Skins Estendidas -->
+    <!-- Menu Principal e Loja -->
     <div id="menu-overlay">
         <div class="menu-card">
             <h1>NEON SNAKE</h1>
-            <input type="text" id="nickname-input" class="menu-input" placeholder="Digite seu Nickname" maxlength="15" value="Player">
-            <p style="color: #aaa; font-size: 12px; margin-bottom: 8px; text-align: left;">ESCOLHA SUA SKIN:</p>
-            <div class="skin-grid">
-                <div class="skin-ball selected" style="background: #00f0ff;" data-color="#00f0ff">Cyan</div>
-                <div class="skin-ball" style="background: #ff0055;" data-color="#ff0055">Pink</div>
-                <div class="skin-ball" style="background: #ffe600;" data-color="#ffe600">Gold</div>
-                <div class="skin-ball" style="background: #a855f7;" data-color="#a855f7">Purple</div>
-                <div class="skin-ball" style="background: #00ff66;" data-color="#00ff66">Neon</div>
-                <div class="skin-ball" style="background: linear-gradient(45deg, #ff0000, #ff7700);" data-color="#ff4400">Fire</div>
-                <div class="skin-ball" style="background: linear-gradient(45deg, #00ffcc, #0033ff);" data-color="#0088ff">Deep</div>
-                <div class="skin-ball" style="background: linear-gradient(45deg, #ff00ff, #7700ff);" data-color="#cc00ff">Magic</div>
-                <div class="skin-ball" style="background: #ffffff;" data-color="#ffffff">Ghost</div>
-                <div class="skin-ball" style="background: #333333; border-color: #666;" data-color="#555555">Void</div>
+            <div class="coin-display">🪙 Moedas: <span id="coin-count">0</span></div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('play')">Jogar</button>
+                <button class="tab-btn" onclick="switchTab('shop')">Loja de Skins</button>
             </div>
-            <button class="btn-play" id="play-btn">JOGAR AGORA</button>
+
+            <!-- Aba Jogar -->
+            <div id="tab-play" class="tab-content active">
+                <input type="text" id="nickname-input" class="menu-input" placeholder="Digite seu Nickname" maxlength="15" value="Player">
+                <button class="btn-play" id="play-btn">JOGAR AGORA</button>
+            </div>
+
+            <!-- Aba Loja -->
+            <div id="tab-shop" class="tab-content">
+                <div class="skin-grid" id="skin-grid">
+                    <!-- Gerado via JS -->
+                </div>
+                <p style="font-size: 11px; color: #aaa;">Clique para equipar ou comprar skins!</p>
+            </div>
         </div>
     </div>
 
@@ -87,7 +112,8 @@
     <div id="gameover-overlay">
         <div class="menu-card">
             <h1 style="color: #ff0055;">VOCÊ MORREU!</h1>
-            <p id="final-score" style="color: #fff; margin-bottom: 20px; font-size: 16px;">Comprimento final: 35</p>
+            <p id="final-score" style="color: #fff; margin-bottom: 5px; font-size: 15px;">Comprimento final: 35</p>
+            <p id="earned-coins" style="color: #ffe600; margin-bottom: 20px; font-size: 14px; font-weight: bold;">+0 Moedas ganhas</p>
             <button class="btn-play" id="respawn-btn">JOGAR NOVAMENTE</button>
         </div>
     </div>
@@ -119,18 +145,80 @@
         const respawnBtn = document.getElementById("respawn-btn");
         const nickInput = document.getElementById("nickname-input");
         const finalScoreEl = document.getElementById("final-score");
+        const earnedCoinsEl = document.getElementById("earned-coins");
+        const coinCountEl = document.getElementById("coin-count");
 
-        let selectedColor = "#00f0ff";
+        // Sistema de Moedas e Skins no LocalStorage
+        let playerCoins = parseInt(localStorage.getItem('snake_coins') || '100');
+        let unlockedSkins = JSON.parse(localStorage.getItem('snake_unlocked') || '["#00f0ff"]');
+        let selectedColor = localStorage.getItem('snake_selected') || '#00f0ff';
+        
+        const skinsList = [
+            { id: '#00f0ff', name: 'Cyan Neon', price: 0 },
+            { id: '#ff0055', name: 'Pink Cyber', price: 0 },
+            { id: '#ffe600', name: 'Gold King', price: 50 },
+            { id: '#a855f7', name: 'Purple Void', price: 50 },
+            { id: '#00ff66', name: 'Toxic Matrix', price: 100 },
+            { id: '#ff4400', name: 'Magma Fire', price: 150 },
+            { id: '#cc00ff', name: 'Wizard Magic', price: 200 },
+            { id: '#ffffff', name: 'Ghost White', price: 250 },
+            { id: '#ff0000', name: 'Bloodline', price: 300 }
+        ];
+
+        function updateShopUI() {
+            coinCountEl.innerText = playerCoins;
+            localStorage.setItem('snake_coins', playerCoins);
+            localStorage.setItem('snake_unlocked', JSON.stringify(unlockedSkins));
+            localStorage.setItem('snake_selected', selectedColor);
+
+            const grid = document.getElementById('skin-grid');
+            grid.innerHTML = '';
+            
+            skinsList.forEach(skin => {
+                let isUnlocked = unlockedSkins.includes(skin.id);
+                let isSelected = selectedColor === skin.id;
+
+                let div = document.createElement('div');
+                div.className = `skin-item ${isSelected ? 'selected' : ''}`;
+                div.innerHTML = `
+                    <div class="skin-preview" style="background: ${skin.id};"></div>
+                    <div class="skin-name">${skin.name}</div>
+                    <div class="skin-price">${isUnlocked ? (isSelected ? 'Equipado' : 'Desbloqueado') : '🪙 ' + skin.price}</div>
+                `;
+                div.onclick = () => selectOrBuySkin(skin);
+                grid.appendChild(div);
+            });
+        }
+
+        function selectOrBuySkin(skin) {
+            if (unlockedSkins.includes(skin.id)) {
+                selectedColor = skin.id;
+            } else if (playerCoins >= skin.price) {
+                playerCoins -= skin.price;
+                unlockedSkins.push(skin.id);
+                selectedColor = skin.id;
+            } else {
+                alert("Moedas insuficientes! Jogue mais partidas para farmar.");
+            }
+            updateShopUI();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (tab === 'play') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('tab-play').classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('tab-shop').classList.add('active');
+            }
+        }
+
+        updateShopUI();
+
         let playerName = "Player";
         let gameStarted = false;
-
-        document.querySelectorAll('.skin-ball').forEach(ball => {
-            ball.addEventListener('click', (e) => {
-                document.querySelectorAll('.skin-ball').forEach(b => b.classList.remove('selected'));
-                e.currentTarget.classList.add('selected');
-                selectedColor = e.currentTarget.getAttribute('data-color');
-            });
-        });
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -185,11 +273,18 @@
         playBtn.addEventListener('click', startGame);
         respawnBtn.addEventListener('click', startGame);
 
-        socket.on('player_died', () => {
+        socket.on('player_died', (data) => {
             gameStarted = false;
             hudEl.style.display = 'none';
             lbEl.style.display = 'none';
-            finalScoreEl.innerText = `Comprimento final: ${snake.body.length}`;
+            
+            // Calcula moedas com base no tamanho final alcançado
+            let earned = Math.floor(data.score / 5);
+            playerCoins += earned;
+            updateShopUI();
+
+            finalScoreEl.innerText = `Comprimento final: ${data.score}`;
+            earnedCoinsEl.innerText = `+${earned} Moedas ganhas na partida!`;
             gameoverOverlay.style.display = 'flex';
         });
 
@@ -275,7 +370,6 @@
             ctx.save();
             ctx.translate(canvas.width / 2 - snake.x, canvas.height / 2 - snake.y);
 
-            // Grid
             ctx.strokeStyle = "#0d0d24";
             ctx.lineWidth = 1.5;
             for (let x = 0; x <= MAP_SIZE; x += 200) {
@@ -289,7 +383,6 @@
             ctx.lineWidth = 6;
             ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-            // Comida
             if (serverData.foods) {
                 for (let f of serverData.foods) {
                     ctx.fillStyle = f.color;
@@ -297,7 +390,6 @@
                 }
             }
 
-            // Bots
             for (let id in serverData.bots) {
                 let b = serverData.bots[id];
                 if (b && b.body) {
@@ -312,7 +404,6 @@
                 }
             }
 
-            // Outros Jogadores
             for (let id in serverData.players) {
                 if (id === socket.id) continue;
                 let p = serverData.players[id];
@@ -330,7 +421,6 @@
                 }
             }
 
-            // Jogador Local
             for (let i = snake.body.length - 1; i >= 0; i--) {
                 let part = snake.body[i];
                 let radius = Math.max(8, snake.radius - (i * 0.05));
@@ -341,7 +431,6 @@
             ctx.fillStyle = selectedColor;
             ctx.beginPath(); ctx.arc(snake.x, snake.y, snake.radius + 2, 0, Math.PI * 2); ctx.fill();
 
-            // Olhos
             let eyeOffset = 7;
             let e1x = snake.x + Math.cos(snake.angle - 0.55) * eyeOffset;
             let e1y = snake.y + Math.sin(snake.angle - 0.55) * eyeOffset;
