@@ -21,7 +21,7 @@
         <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
             <div>
                 <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (COBRA.IO)</h1>
-                <p class="text-xs text-slate-400">Colete as orbes de massa espalhadas pelo mapa para crescer!</p>
+                <p class="text-xs text-slate-400">Colete as orbes de massa reais espalhadas pelo mapa para crescer!</p>
             </div>
             <div class="flex gap-4">
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- Lógica Atualizada (Orbes Estilo Cobra.io) -->
+    <!-- Lógica com Orbes Orgânicas Estilo Snake.io / Slither.io -->
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -106,16 +106,17 @@
         let minhaCor = "#06b6d4";
         let outrosJogadores = {};
 
-        // Geração de centenas de orbes de massa espalhadas pelo mapa (Estilo Slither/Cobra.io)
+        // Geração de orbes com posições livres em pixels (sem travar na grade de blocos)
         let orbesMassa = [];
-        const TOTAL_ORBES = 300;
-        const coresOrbes = ["#f43f5e", "#eab308", "#06b6d4", "#a855f7", "#22c55e", "#ec4899"];
+        const TOTAL_ORBES = 400;
+        const coresOrbes = ["#f43f5e", "#eab308", "#06b6d4", "#a855f7", "#22c55e", "#ec4899", "#38bdf8"];
 
         function gerarOrbesIniciais() {
             for (let i = 0; i < TOTAL_ORBES; i++) {
                 orbesMassa.push({
-                    x: Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE,
-                    y: Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE,
+                    x: Math.random() * (MAP_WIDTH - 40) + 20,
+                    y: Math.random() * (MAP_HEIGHT - 40) + 20,
+                    raio: Math.random() * 3 + 4, // Tamanho orgânico variado (entre 4px e 7px)
                     cor: coresOrbes[Math.floor(Math.random() * coresOrbes.length)]
                 });
             }
@@ -197,25 +198,34 @@
 
             snake.unshift(cabeca);
 
-            // Verificar colisão com as várias orbes de massa espalhadas
+            // Colisão precisa baseada em distância (Raio x Raio) com as orbes circulares
             let comeuOrbe = false;
+            const raioCabeca = GRID_SIZE / 2;
+            const cabecaCentroX = cabeca.x + raioCabeca;
+            const cabecaCentroY = cabeca.y + raioCabeca;
+
             for (let i = orbesMassa.length - 1; i >= 0; i--) {
                 let o = orbesMassa[i];
-                if (Math.abs(cabeca.x - o.x) < GRID_SIZE && Math.abs(cabeca.y - o.y) < GRID_SIZE) {
+                let distanciaX = cabecaCentroX - o.x;
+                let distanciaY = cabecaCentroY - o.y;
+                let distanciaTotal = Math.sqrt(distanciaX * distanciaX + distanciaY * distanciaY);
+
+                // Se encostou na orbe orgânica
+                if (distanciaTotal < raioCabeca + o.raio) {
                     comeuOrbe = true;
                     moedasCount += 1;
                     moedasEl.innerText = moedasCount;
 
-                    // Reposiciona a orbe comida em outro lugar aleatório do mapa (Mantém o fluxo constante)
-                    orbesMassa[i].x = Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE;
-                    orbesMassa[i].y = Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE;
+                    // Reposiciona a orbe em outro ponto totalmente aleatório do mapa
+                    orbesMassa[i].x = Math.random() * (MAP_WIDTH - 40) + 20;
+                    orbesMassa[i].y = Math.random() * (MAP_HEIGHT - 40) + 20;
                     orbesMassa[i].cor = coresOrbes[Math.floor(Math.random() * coresOrbes.length)];
-                    break; // Come uma por vez por frame
+                    break;
                 }
             }
 
             if (!comeuOrbe) {
-                snake.pop(); // Mantém o tamanho se não comeu
+                snake.pop(); 
             }
 
             tamanhoEl.innerText = snake.length;
@@ -249,13 +259,13 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-            // Desenhar todas as Orbes de Massa (Estilo Cobra.io)
+            // Desenhar Orbes de Massa em formato circular livre (Estilo Slither/Cobra.io real)
             for (let o of orbesMassa) {
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = 10;
                 ctx.shadowColor = o.cor;
                 ctx.fillStyle = o.cor;
                 ctx.beginPath();
-                ctx.arc(o.x + GRID_SIZE/2, o.y + GRID_SIZE/2, 6, 0, Math.PI * 2);
+                ctx.arc(o.x, o.y, o.raio, 0, Math.PI * 2);
                 ctx.fill();
             }
 
