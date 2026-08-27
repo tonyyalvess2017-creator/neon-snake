@@ -13,7 +13,6 @@ let bots = {};
 let foods = [];
 const MAP_SIZE = 6000;
 
-// Gera comida inicial
 for (let i = 0; i < 2000; i++) {
     foods.push({
         id: i,
@@ -49,8 +48,6 @@ function spawnBot(id, name) {
 }
 
 io.on('connection', (socket) => {
-    console.log(`[+] Conectado: ${socket.id}`);
-
     socket.on('player_join', (data) => {
         players[socket.id] = {
             id: socket.id,
@@ -79,9 +76,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Loop principal de lógica do servidor
 setInterval(() => {
-    // 1. Atualiza Bots com IA fluida
     for (let id in bots) {
         let bot = bots[id];
         bot.changeTimer++;
@@ -113,10 +108,8 @@ setInterval(() => {
         }
     }
 
-    // 2. Checagem de Colisão (Morte e Comida)
     let allEntities = { ...players, ...bots };
 
-    // Come comida (Players e Bots)
     for (let id in allEntities) {
         let entity = allEntities[id];
         if (!entity || !entity.body) continue;
@@ -125,45 +118,40 @@ setInterval(() => {
             let f = foods[i];
             let dist = Math.hypot(entity.x - f.x, entity.y - f.y);
             if (dist < 20) {
-                // Cresce adicionando partes ao corpo
                 let tail = entity.body[entity.body.length - 1];
                 entity.body.push({ x: tail.x, y: tail.y });
-                // Reposiciona a comida comida
                 foods[i].x = Math.random() * MAP_SIZE;
                 foods[i].y = Math.random() * MAP_SIZE;
             }
         }
     }
 
-    // Colisão entre cabeças e corpos (Morte)
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
 
-        // Bateu nas bordas do mapa
         if (p.x <= 30 || p.x >= MAP_SIZE - 30 || p.y <= 30 || p.y >= MAP_SIZE - 30) {
-            io.to(pId).emit('player_died');
+            io.to(pId).emit('player_died', { score: p.body.length });
             delete players[pId];
             continue;
         }
 
-        // Bateu em outros corpos (inclusive o próprio)
         for (let oId in allEntities) {
             let target = allEntities[oId];
             if (!target || !target.body) continue;
 
-            let startIdx = (pId === oId) ? 5 : 0; // Ignora o próprio pescoço imediato
+            let startIdx = (pId === oId) ? 5 : 0;
             for (let i = startIdx; i < target.body.length; i++) {
                 let part = target.body[i];
                 let dist = Math.hypot(p.x - part.x, p.y - part.y);
                 if (dist < 14) {
-                    // Morreu! Transforma o corpo em comida
+                    let finalScore = p.body.length;
                     p.body.forEach((pt, index) => {
                         if (index % 2 === 0) {
                             foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
                         }
                     });
-                    io.to(pId).emit('player_died');
+                    io.to(pId).emit('player_died', { score: finalScore });
                     delete players[pId];
                     break;
                 }
