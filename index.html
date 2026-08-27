@@ -21,14 +21,14 @@
         <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
             <div>
                 <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (MUNDO LIVRE)</h1>
-                <p class="text-xs text-slate-400">Jogabilidade ultra fluida para Teclado e Controle Xbox!</p>
+                <p class="text-xs text-slate-400">Modo Clássico Fluido: Crescimento garantido e controles otimizados!</p>
             </div>
             <div class="flex gap-4">
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
                     🪙 MOEDAS: <span id="moedas" class="text-white text-sm">0</span>
                 </div>
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-cyan-400 flex items-center gap-1">
-                    TAMANHO: <span id="tamanho" class="text-white text-sm">15</span>
+                    TAMANHO: <span id="tamanho" class="text-white text-sm">5</span>
                 </div>
             </div>
         </div>
@@ -69,12 +69,12 @@
 
         <!-- Rodapé -->
         <div class="flex justify-between w-full mt-3 text-xs text-slate-400 px-1">
-            <span>🕹️ Controles: Teclado (WASD / Setas) ou Controle Xbox (Analógico)</span>
+            <span>🕹️ Controles: Teclado (WASD / Setas) ou Controle Xbox (Analógico / D-Pad)</span>
             <span class="text-emerald-400 font-semibold">⚡ Servidor Online Ativo</span>
         </div>
     </div>
 
-    <!-- Lógica Otimizada do Jogo -->
+    <!-- Lógica do Jogo com Grid Clássico -->
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -85,21 +85,26 @@
             transports: ['websocket', 'polling']
         });
         
+        const GRID_SIZE = 20;
         const MAP_WIDTH = 2500;
         const MAP_HEIGHT = 2500;
 
-        let posX = 1250;
-        let posY = 1250;
-        let velX = 4; // Velocidade fluida em X
-        let velY = 0; // Velocidade fluida em Y
-        let ultimaDirecao = "RIGHT";
+        let snake = [
+            { x: 1250, y: 1250 },
+            { x: 1230, y: 1250 },
+            { x: 1210, y: 1250 },
+            { x: 1190, y: 1250 },
+            { x: 1170, y: 1250 }
+        ];
         
-        let corpo = [];
-        let comprimentoDesejado = 15;
+        let dx = GRID_SIZE;
+        let dy = 0;
+        let proximaDirecaoValida = "RIGHT";
+
         let moedasCount = 0;
         let minhaCor = "#06b6d4";
 
-        let comida = { x: posX + 150, y: posY + 100, cor: "#f43f5e" };
+        let comida = { x: 1350, y: 1250, cor: "#f43f5e" };
         let outrosJogadores = {};
 
         function mudarSkin(corHex, custo) {
@@ -112,23 +117,24 @@
             }
         }
 
-        // Sistema de Teclado Fluido
+        // Eventos de Teclado (Padrão Cobra Clássico)
         window.addEventListener("keydown", (e) => {
-            if ((e.key === "ArrowUp" || e.key === "w" || e.key === "W") && ultimaDirecao !== "DOWN") {
-                velX = 0; velY = -4; ultimaDirecao = "UP";
+            const key = e.key;
+            if ((key === "ArrowUp" || key === "w" || key === "W") && dy === 0) {
+                dx = 0; dy = -GRID_SIZE;
             }
-            if ((e.key === "ArrowDown" || e.key === "s" || e.key === "S") && ultimaDirecao !== "UP") {
-                velX = 0; velY = 4; ultimaDirecao = "DOWN";
+            if ((key === "ArrowDown" || key === "s" || key === "S") && dy === 0) {
+                dx = 0; dy = GRID_SIZE;
             }
-            if ((e.key === "ArrowLeft" || e.key === "a" || e.key === "A") && ultimaDirecao !== "RIGHT") {
-                velX = -4; velY = 0; ultimaDirecao = "LEFT";
+            if ((key === "ArrowLeft" || key === "a" || key === "A") && dx === 0) {
+                dx = -GRID_SIZE; dy = 0;
             }
-            if ((e.key === "ArrowRight" || e.key === "d" || e.key === "D") && ultimaDirecao !== "LEFT") {
-                velX = 4; velY = 0; ultimaDirecao = "RIGHT";
+            if ((key === "ArrowRight" || key === "d" || key === "D") && dx === 0) {
+                dx = GRID_SIZE; dy = 0;
             }
         });
 
-        // Suporte Direto e Preciso ao Analógico do Controle Xbox
+        // Controles de Analógico e D-Pad do Xbox Otimizados
         function lerControleXbox() {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             if (!gamepads[0]) return;
@@ -136,23 +142,23 @@
             
             const eixoX = gp.axes[0];
             const eixoY = gp.axes[1];
-            const deadzone = 0.25;
+            const deadzone = 0.3;
 
             if (Math.abs(eixoX) > deadzone || Math.abs(eixoY) > deadzone) {
                 if (Math.abs(eixoX) > Math.abs(eixoY)) {
-                    if (eixoX > 0 && ultimaDirecao !== "LEFT") { velX = 4; velY = 0; ultimaDirecao = "RIGHT"; }
-                    else if (eixoX < 0 && ultimaDirecao !== "RIGHT") { velX = -4; velY = 0; ultimaDirecao = "LEFT"; }
+                    if (eixoX > 0 && dx === 0) { dx = GRID_SIZE; dy = 0; }
+                    else if (eixoX < 0 && dx === 0) { dx = -GRID_SIZE; dy = 0; }
                 } else {
-                    if (eixoY > 0 && ultimaDirecao !== "UP") { velX = 0; velY = 4; ultimaDirecao = "DOWN"; }
-                    else if (eixoY < 0 && ultimaDirecao !== "DOWN") { velX = 0; velY = -4; ultimaDirecao = "UP"; }
+                    if (eixoY > 0 && dy === 0) { dx = 0; dy = GRID_SIZE; }
+                    else if (eixoY < 0 && dy === 0) { dx = 0; dy = -GRID_SIZE; }
                 }
             }
 
-            // D-Pad do controle Xbox
-            if (gp.buttons[12] && gp.buttons[12].pressed && ultimaDirecao !== "DOWN") { velX = 0; velY = -4; ultimaDirecao = "UP"; }
-            if (gp.buttons[13] && gp.buttons[13].pressed && ultimaDirecao !== "UP") { velX = 0; velY = 4; ultimaDirecao = "DOWN"; }
-            if (gp.buttons[14] && gp.buttons[14].pressed && ultimaDirecao !== "RIGHT") { velX = -4; velY = 0; ultimaDirecao = "LEFT"; }
-            if (gp.buttons[15] && gp.buttons[15].pressed && ultimaDirecao !== "LEFT") { velX = 4; velY = 0; ultimaDirecao = "RIGHT"; }
+            // D-Pad do Xbox
+            if (gp.buttons[12] && gp.buttons[12].pressed && dy === 0) { dx = 0; dy = -GRID_SIZE; }
+            if (gp.buttons[13] && gp.buttons[13].pressed && dy === 0) { dx = 0; dy = GRID_SIZE; }
+            if (gp.buttons[14] && gp.buttons[14].pressed && dx === 0) { dx = -GRID_SIZE; dy = 0; }
+            if (gp.buttons[15] && gp.buttons[15].pressed && dx === 0) { dx = GRID_SIZE; dy = 0; }
         }
 
         socket.on("atualizar_arena", (dados) => {
@@ -162,41 +168,42 @@
         function atualizar() {
             lerControleXbox();
 
-            posX += velX;
-            posY += velY;
+            // Nova cabeça baseada na direção do grid
+            const cabeca = { x: snake[0].x + dx, y: snake[0].y + dy };
 
-            // Limites das Bordas do Mapa
-            if (posX < 20) posX = 20;
-            if (posX > MAP_WIDTH - 20) posX = MAP_WIDTH - 20;
-            if (posY < 20) posY = 20;
-            if (posY > MAP_HEIGHT - 20) posY = MAP_HEIGHT - 20;
+            // Limites das bordas
+            if (cabeca.x < 0) cabeca.x = MAP_WIDTH - GRID_SIZE;
+            if (cabeca.x >= MAP_WIDTH) cabeca.x = 0;
+            if (cabeca.y < 0) cabeca.y = MAP_HEIGHT - GRID_SIZE;
+            if (cabeca.y >= MAP_HEIGHT) cabeca.y = 0;
 
-            corpo.unshift({ x: posX, y: posY });
-            if (corpo.length > comprimentoDesejado) {
-                corpo.pop();
-            }
+            snake.unshift(cabeca);
 
-            tamanhoEl.innerText = corpo.length;
-
-            // Sistema de Comida Garantida Próxima
-            let distanciaComida = Math.hypot(posX - comida.x, posY - comida.y);
-            if (distanciaComida < 30) {
-                comprimentoDesejado += 4;
+            // Verificar se comeu a comida
+            let comeu = Math.abs(cabeca.x - comida.x) < GRID_SIZE && Math.abs(cabeca.y - comida.y) < GRID_SIZE;
+            if (comeu) {
                 moedasCount += 1;
                 moedasEl.innerText = moedasCount;
+                tamanhoEl.innerText = snake.length;
 
-                let angulo = Math.random() * Math.PI * 2;
-                let distancia = Math.random() * 250 + 80;
-                comida.x = Math.max(50, Math.min(MAP_WIDTH - 50, posX + Math.cos(angulo) * distancia));
-                comida.y = Math.max(50, Math.min(MAP_HEIGHT - 50, posY + Math.sin(angulo) * distancia));
+                // Reposicionar comida longe e alinhada ao grid
+                comida.x = Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE;
+                comida.y = Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE;
+            } else {
+                // Remove a cauda se não comeu (mantém o tamanho correto)
+                snake.pop();
             }
 
-            socket.emit("player_sync", { x: posX, y: posY, corpo: corpo, cor: minhaCor });
+            tamanhoEl.innerText = snake.length;
+
+            // Sincronizar com o servidor multiplayer
+            socket.emit("player_sync", { x: cabeca.x, y: cabeca.y, corpo: snake, cor: minhaCor });
         }
 
         function desenhar() {
-            let camX = posX - canvas.width / 2;
-            let camY = posY - canvas.height / 2;
+            let cabeca = snake[0];
+            let camX = cabeca.x - canvas.width / 2;
+            let camY = cabeca.y - canvas.height / 2;
 
             ctx.fillStyle = "#020617";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -219,15 +226,22 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-            // Comida
+            // Desenhar Comida
             ctx.shadowBlur = 18;
             ctx.shadowColor = comida.cor;
             ctx.fillStyle = comida.cor;
             ctx.beginPath();
-            ctx.arc(comida.x, comida.y, 8, 0, Math.PI * 2);
+            ctx.arc(comida.x + GRID_SIZE/2, comida.y + GRID_SIZE/2, 8, 0, Math.PI * 2);
             ctx.fill();
 
-            // Outros Jogadores
+            // Desenhar Minha Cobra
+            ctx.shadowColor = minhaCor;
+            ctx.fillStyle = minhaCor;
+            for (let parte of snake) {
+                ctx.fillRect(parte.x + 1, parte.y + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+            }
+
+            // Desenhar Outros Jogadores
             for (let id in outrosJogadores) {
                 let p = outrosJogadores[id];
                 let corOutro = p.cor || "#f43f5e";
@@ -235,7 +249,7 @@
                 ctx.fillStyle = corOutro;
                 if (p.corpo) {
                     for (let parte of p.corpo) {
-                        ctx.fillRect(parte.x - 6, parte.y - 6, 12, 12);
+                        ctx.fillRect(parte.x + 1, parte.y + 1, GRID_SIZE - 2, GRID_SIZE - 2);
                     }
                 }
             }
@@ -243,13 +257,24 @@
             ctx.restore();
         }
 
-        function loop() {
-            atualizar();
+        // Controlar a velocidade do game loop para o padrão de cobrinha (10 frames por segundo)
+        let ultimoTempo = 0;
+        const velocidadeJogo = 110; // Milissegundos por passo (menor = mais rápido)
+
+        function loop(tempoAtual) {
+            if (!ultimoTempo) ultimoTempo = tempoAtual;
+            let delta = tempoAtual - ultimoTempo;
+
+            if (delta > velocidadeJogo) {
+                atualizar();
+                ultimoTempo = tempoAtual;
+            }
+
             desenhar();
             requestAnimationFrame(loop);
         }
 
-        loop();
+        requestAnimationFrame(loop);
     </script>
 </body>
 </html>
