@@ -17,8 +17,9 @@ app.use(express.static(__dirname));
 let players = {}; 
 let bots = {};    
 let foods = [];   
-const MAP_SIZE = 6000; // Tamanho do mapa
+const MAP_SIZE = 6000; // Tamanho total do mapa em pixels
 
+// Gera a comida inicial espalhada pelo mapa
 for (let i = 0; i < 1500; i++) {
     foods.push({
         id: i,
@@ -29,7 +30,7 @@ for (let i = 0; i < 1500; i++) {
 }
 
 // ==========================================
-// 3. SISTEMA DE BOTS (IA) COM NOMES PERSONALIZADOS
+// 3. SISTEMA DE BOTS COM NOMES REAIS
 // ==========================================
 const botNames = ["Bernardo", "Gabriel", "Lucas", "Igor", "Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
 
@@ -60,7 +61,7 @@ function spawnBot(id, name) {
 }
 
 // ==========================================
-// 4. CONEXÕES DOS JOGADORES (COM BLINDAGEM DE BORDA)
+// 4. CONEXÕES E SINCRONIZAÇÃO DE DADOS
 // ==========================================
 io.on('connection', (socket) => {
     socket.on('player_join', (data) => {
@@ -71,13 +72,13 @@ io.on('connection', (socket) => {
             y: data.y,
             angle: 0,
             body: data.body || [],
-            color: data.color || '#00f0ff'
+            color: data.color || '#00f0ff' // Recebe a cor escolhida na Loja
         };
     });
 
+    // BLINDAGEM DE BORDA NO SERVIDOR: Impede que o jogador ultrapasse o limite
     socket.on('player_sync', (data) => {
         if (players[socket.id]) {
-            // Trava rígida para impedir que o cliente ultrapasse o limite do mapa
             let clampedX = Math.max(60, Math.min(MAP_SIZE - 60, data.x));
             let clampedY = Math.max(60, Math.min(MAP_SIZE - 60, data.y));
 
@@ -85,7 +86,7 @@ io.on('connection', (socket) => {
             players[socket.id].y = clampedY;
             players[socket.id].angle = data.angle;
             players[socket.id].body = data.body;
-            players[socket.id].color = data.color;
+            players[socket.id].color = data.color; // Atualiza a cor se mudou
             players[socket.id].name = data.name;
         }
     });
@@ -96,7 +97,7 @@ io.on('connection', (socket) => {
 });
 
 // ==========================================
-// 5. LOOP PRINCIPAL (OTIMIZADO PARA 60 FPS)
+// 5. LOOP DO SERVIDOR (60 FPS)
 // ==========================================
 setInterval(() => {
     
@@ -134,7 +135,7 @@ setInterval(() => {
 
     let allEntities = { ...players, ...bots };
 
-    // --- 5.2 Consumo de Comida ---
+    // --- 5.2 Consumo de Comida (Crescimento da Cobra) ---
     for (let id in allEntities) {
         let entity = allEntities[id];
         if (!entity || !entity.body) continue;
@@ -142,15 +143,18 @@ setInterval(() => {
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
             if (Math.abs(entity.x - f.x) < 20 && Math.abs(entity.y - f.y) < 20) {
+                // Adiciona um novo segmento na cauda
                 let tail = entity.body[entity.body.length - 1];
                 entity.body.push({ x: tail.x, y: tail.y });
+                
+                // Reposiciona a comida comida
                 foods[i].x = Math.random() * MAP_SIZE;
                 foods[i].y = Math.random() * MAP_SIZE;
             }
         }
     }
 
-    // --- 5.3 Colisão PVP Limpa (Com folga de 18 partes para zerar morte fantasma) ---
+    // --- 5.3 Colisão PVP Segura (Folga de 18 partes para zerar mortes falsas) ---
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
@@ -160,7 +164,7 @@ setInterval(() => {
             let target = allEntities[oId];
             if (!target || !target.body) continue;
 
-            // Ignora os primeiros 18 segmentos do próprio corpo para evitar colisão ao fazer curvas
+            // Ignora os primeiros 18 segmentos do próprio corpo para curvar sem morrer
             let startIdx = (pId === oId) ? 18 : 0;
             
             for (let i = startIdx; i < target.body.length; i += 2) {
@@ -175,6 +179,7 @@ setInterval(() => {
 
         if (morreu) {
             let finalScore = p.body.length;
+            // Transforma o corpo da cobra morta em comida no mapa
             p.body.forEach((pt, index) => {
                 if (index % 2 === 0) {
                     foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
@@ -185,6 +190,7 @@ setInterval(() => {
         }
     }
 
+    // --- 5.4 Sincronização Geral para Todos ---
     io.emit('server_update', { players, bots, foods });
 
 }, 1000 / 60);
@@ -193,4 +199,4 @@ setInterval(() => {
 // 6. INICIALIZAÇÃO
 // ==========================================
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor rodando perfeitamente na porta ${PORT}`));
