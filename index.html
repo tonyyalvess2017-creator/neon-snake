@@ -9,16 +9,64 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html { width: 100%; height: 100%; background: #020208; overflow: hidden; font-family: system-ui, sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; background: #050510; }
+        
+        /* Menu de Entrada / Skins */
+        #menu-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(2, 2, 8, 0.92); backdrop-filter: blur(15px);
+            display: flex; justify-content: center; align-items: center; z-index: 100;
+        }
+        .menu-card {
+            background: rgba(10, 10, 25, 0.9); border: 1px solid rgba(255,255,255,0.1);
+            padding: 40px; border-radius: 20px; width: 380px; text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+        .menu-card h1 { color: #fff; font-size: 28px; margin-bottom: 25px; letter-spacing: 2px; }
+        .menu-input {
+            width: 100%; padding: 14px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px; color: #fff; font-size: 16px; margin-bottom: 20px; outline: none; text-align: center;
+        }
+        .menu-input:focus { border-color: #00f0ff; box-shadow: 0 0 10px rgba(0,240,255,0.3); }
+        .skin-selector { display: flex; justify-content: center; gap: 12px; margin-bottom: 25px; }
+        .skin-ball {
+            width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+        .skin-ball:hover { transform: scale(1.15); }
+        .skin-ball.selected { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 15px currentColor; }
+        .btn-play {
+            width: 100%; padding: 14px; background: linear-gradient(135deg, #00f0ff, #0077ff);
+            border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 700;
+            cursor: pointer; transition: filter 0.2s;
+        }
+        .btn-play:hover { filter: brightness(1.2); }
+
         #hud {
             position: fixed; top: 20px; left: 20px; z-index: 10;
             background: rgba(5, 5, 15, 0.85); border: 1px solid rgba(255,255,255,0.1);
             padding: 12px 20px; border-radius: 12px; backdrop-filter: blur(10px);
-            display: flex; gap: 20px; align-items: center; color: #fff;
+            display: none; gap: 20px; align-items: center; color: #fff;
         }
         .hud-item span { color: #00f0ff; font-weight: 700; }
     </style>
 </head>
 <body>
+
+    <!-- Menu Estilo Slither.io -->
+    <div id="menu-overlay">
+        <div class="menu-card">
+            <h1>NEON SNAKE</h1>
+            <input type="text" id="nickname-input" class="menu-input" placeholder="Digite seu Nickname" maxlength="15" value="Player">
+            <div class="skin-selector">
+                <div class="skin-ball selected" style="background: #00f0ff;" data-color="#00f0ff"></div>
+                <div class="skin-ball" style="background: #ff0055;" data-color="#ff0055"></div>
+                <div class="skin-ball" style="background: #ffe600;" data-color="#ffe600"></div>
+                <div class="skin-ball" style="background: #a855f7;" data-color="#a855f7"></div>
+                <div class="skin-ball" style="background: #00ff66;" data-color="#00ff66"></div>
+            </div>
+            <button class="btn-play" id="play-btn">JOGAR AGORA</button>
+        </div>
+    </div>
 
     <div id="hud">
         <div class="hud-item">STATUS: <span id="net-status" style="color: #fbbf24;">Conectando...</span></div>
@@ -33,6 +81,22 @@
         const ctx = canvas.getContext("2d");
         const scoreEl = document.getElementById("score-val");
         const statusEl = document.getElementById("net-status");
+        const menuOverlay = document.getElementById("menu-overlay");
+        const hudEl = document.getElementById("hud");
+        const playBtn = document.getElementById("play-btn");
+        const nickInput = document.getElementById("nickname-input");
+
+        let selectedColor = "#00f0ff";
+        let playerName = "Player";
+        let gameStarted = false;
+
+        document.querySelectorAll('.skin-ball').forEach(ball => {
+            ball.addEventListener('click', (e) => {
+                document.querySelectorAll('.skin-ball').forEach(b => b.classList.remove('selected'));
+                e.target.classList.add('selected');
+                selectedColor = e.target.getAttribute('data-color');
+            });
+        });
 
         function resize() {
             canvas.width = window.innerWidth;
@@ -50,30 +114,16 @@
             statusEl.style.color = "#34d399";
         });
 
-        socket.on("disconnect", () => {
-            statusEl.innerText = "Desconectado";
-            statusEl.style.color = "#f87171";
-        });
-
         const MAP_SIZE = 6000;
-        const colorsList = ['#00f0ff', '#ff0055', '#ffe600', '#a855f7', '#00ff66'];
-        const myColor = colorsList[Math.floor(Math.random() * colorsList.length)];
-
         let snake = {
-            x: MAP_SIZE / 2,
-            y: MAP_SIZE / 2,
-            angle: 0,
-            speed: 4,
-            radius: 14,
-            body: []
+            x: MAP_SIZE / 2, y: MAP_SIZE / 2,
+            angle: 0, speed: 4, radius: 14, body: []
         };
 
         const LINK_DIST = 12;
         for (let i = 0; i < 35; i++) {
             snake.body.push({ x: snake.x, y: snake.y + (i * 4) });
         }
-
-        socket.emit('player_join', { x: snake.x, y: snake.y, body: snake.body, color: myColor });
 
         let mouseX = window.innerWidth / 2;
         let mouseY = window.innerHeight / 2;
@@ -84,19 +134,42 @@
             mouseY = e.clientY;
         });
 
+        playBtn.addEventListener('click', () => {
+            playerName = nickInput.value.trim() || "Player";
+            menuOverlay.style.display = 'none';
+            hudEl.style.display = 'flex';
+            gameStarted = true;
+            socket.emit('player_join', { x: snake.x, y: snake.y, body: snake.body, color: selectedColor, name: playerName });
+        });
+
         socket.on('server_update', (data) => {
             serverData = data;
         });
 
         function update() {
-            const worldMouseX = mouseX - canvas.width / 2 + snake.x;
-            const worldMouseY = mouseY - canvas.height / 2 + snake.y;
+            if (!gameStarted) return;
 
-            let targetAngle = Math.atan2(worldMouseY - snake.y, worldMouseX - snake.x);
-            let diff = targetAngle - snake.angle;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            snake.angle += diff * 0.15;
+            // Suporte a Controle de Xbox / Gamepad API (Analógico Esquerdo)
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            let gp = gamepads[0]; // Pega o primeiro controle conectado
+            let hasControllerInput = false;
+
+            if (gp && (Math.abs(gp.axes[0]) > 0.1 || Math.abs(gp.axes[1]) > 0.1)) {
+                let axisX = gp.axes[0];
+                let axisY = gp.axes[1];
+                snake.angle = Math.atan2(axisY, axisX);
+                hasControllerInput = true;
+            }
+
+            if (!hasControllerInput) {
+                const worldMouseX = mouseX - canvas.width / 2 + snake.x;
+                const worldMouseY = mouseY - canvas.height / 2 + snake.y;
+                let targetAngle = Math.atan2(worldMouseY - snake.y, worldMouseX - snake.x);
+                let diff = targetAngle - snake.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                snake.angle += diff * 0.15;
+            }
 
             snake.x += Math.cos(snake.angle) * snake.speed;
             snake.y += Math.sin(snake.angle) * snake.speed;
@@ -122,11 +195,8 @@
             }
 
             socket.emit('player_sync', {
-                x: snake.x,
-                y: snake.y,
-                angle: snake.angle,
-                score: snake.body.length,
-                body: snake.body
+                x: snake.x, y: snake.y, angle: snake.angle,
+                score: snake.body.length, body: snake.body, name: playerName, color: selectedColor
             });
         }
 
@@ -134,10 +204,12 @@
             ctx.fillStyle = "#050510";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            if (!gameStarted) return;
+
             ctx.save();
             ctx.translate(canvas.width / 2 - snake.x, canvas.height / 2 - snake.y);
 
-            // Grid do mapa visível
+            // Grid
             ctx.strokeStyle = "#0d0d24";
             ctx.lineWidth = 1.5;
             for (let x = 0; x <= MAP_SIZE; x += 200) {
@@ -147,7 +219,6 @@
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); ctx.stroke();
             }
 
-            // Borda do mapa
             ctx.strokeStyle = "#ff0055";
             ctx.lineWidth = 6;
             ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
@@ -156,22 +227,24 @@
             if (serverData.foods) {
                 for (let f of serverData.foods) {
                     ctx.fillStyle = f.color;
-                    ctx.beginPath();
-                    ctx.arc(f.x, f.y, 4, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, Math.PI * 2); ctx.fill();
                 }
             }
 
-            // Outros Jogadores
+            // Outros Jogadores + Nicknames
             for (let id in serverData.players) {
                 if (id === socket.id) continue;
                 let p = serverData.players[id];
                 if (p && p.body) {
                     ctx.fillStyle = p.color || '#ff0055';
                     for (let part of p.body) {
-                        ctx.beginPath();
-                        ctx.arc(part.x, part.y, 13, 0, Math.PI * 2);
-                        ctx.fill();
+                        ctx.beginPath(); ctx.arc(part.x, part.y, 13, 0, Math.PI * 2); ctx.fill();
+                    }
+                    if (p.name) {
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "12px system-ui";
+                        ctx.textAlign = "center";
+                        ctx.fillText(p.name, p.x, p.y - 22);
                     }
                 }
             }
@@ -180,18 +253,14 @@
             for (let i = snake.body.length - 1; i >= 0; i--) {
                 let part = snake.body[i];
                 let radius = Math.max(8, snake.radius - (i * 0.05));
-                ctx.fillStyle = myColor;
-                ctx.beginPath();
-                ctx.arc(part.x, part.y, radius, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = selectedColor;
+                ctx.beginPath(); ctx.arc(part.x, part.y, radius, 0, Math.PI * 2); ctx.fill();
             }
 
-            // Cabeça e olhos
-            ctx.fillStyle = myColor;
-            ctx.beginPath();
-            ctx.arc(snake.x, snake.y, snake.radius + 2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillStyle = selectedColor;
+            ctx.beginPath(); ctx.arc(snake.x, snake.y, snake.radius + 2, 0, Math.PI * 2); ctx.fill();
 
+            // Olhos
             let eyeOffset = 7;
             let e1x = snake.x + Math.cos(snake.angle - 0.55) * eyeOffset;
             let e1y = snake.y + Math.sin(snake.angle - 0.55) * eyeOffset;
@@ -205,6 +274,12 @@
             ctx.fillStyle = "#020208";
             ctx.beginPath(); ctx.arc(e1x + Math.cos(snake.angle)*1.5, e1y + Math.sin(snake.angle)*1.5, 1.8, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(e2x + Math.cos(snake.angle)*1.5, e2y + Math.sin(snake.angle)*1.5, 1.8, 0, Math.PI * 2); ctx.fill();
+
+            // Nome do player local
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 13px system-ui";
+            ctx.textAlign = "center";
+            ctx.fillText(playerName, snake.x, snake.y - 25);
 
             ctx.restore();
             scoreEl.innerText = snake.body.length;
