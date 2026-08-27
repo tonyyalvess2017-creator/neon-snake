@@ -63,7 +63,7 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-    // Coleta de comida pelos jogadores
+    // Processamento centralizado de comida: garante que apenas quem colide de fato com a bolinha cresce e atualiza o tamanho real
     for (let id in players) {
         let p = players[id];
         if (!p || !p.body) continue;
@@ -71,22 +71,25 @@ setInterval(() => {
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
             let dist = Math.hypot(p.x - f.x, p.y - f.y);
-            if (dist < 20) {
+            if (dist < 22) {
+                // Adiciona novas partes ao corpo da cobra com base estrita na comida ingerida
                 let tail = p.body[p.body.length - 1];
                 p.body.push({ x: tail.x, y: tail.y });
+                
+                // Reposiciona a comida coletada no mapa
                 foods[i].x = Math.random() * MAP_SIZE;
                 foods[i].y = Math.random() * MAP_SIZE;
             }
         }
     }
 
-    // Validação de colisão PVP (Apenas entre jogadores diferentes)
+    // Validação de colisão PVP
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
 
         for (let oId in players) {
-            if (pId === oId) continue; // Ignora o próprio jogador
+            if (pId === oId) continue;
             let target = players[oId];
             if (!target || !target.body) continue;
 
