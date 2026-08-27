@@ -1,1 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slither Clone - Arena PvP</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { background: #05050a; color: white; font-family: sans-serif; overflow: hidden; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { background: #090913; box-shadow: 0 0 50px rgba(0,0,0,0.8); border: 2px solid #1e1e3f; }
+    </style>
+</head>
+<body>
 
+    <div class="absolute top-4 left-4 bg-slate-900/80 border border-slate-700 px-4 py-2 rounded-xl text-sm">
+        👑 Tamanho/Placar: <span id="placar" class="text-cyan-400 font-bold">10</span>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const placarEl = document.getElementById("placar");
+
+        const MAP_SIZE = 3000;
+        
+        // Posição e física da cobra do jogador
+        let snake = {
+            x: 1500,
+            y: 1500,
+            angulo: 0,
+            velocidade: 3,
+            raio: 12,
+            cor: "#00ffcc",
+            corpo: [] // Histórico de posições para formar o rabo
+        };
+
+        // Inicializar o corpo com 20 seguimentos iniciais
+        for (let i = 0; i < 25; i++) {
+            snake.corpo.push({ x: 1500, y: 1500 + (i * 5) });
+        }
+
+        // Mouse para guiar a direção
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+
+        window.addEventListener("mousemove", (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Geração de Orbes de Massa espalhadas pelo mapa
+        let orbes = [];
+        for (let i = 0; i < 500; i++) {
+            orbes.push({
+                x: Math.random() * MAP_SIZE,
+                y: Math.random() * MAP_SIZE,
+                raio: Math.random() * 3 + 2,
+                cor: ["#ff0055", "#00ffcc", "#ffcc00", "#9900ff"][Math.floor(Math.random() * 4)]
+            });
+        }
+
+        function atualizar() {
+            // Calcular ângulo em direção ao mouse (relativo ao centro da tela)
+            const centroX = canvas.width / 2;
+            const centroY = canvas.height / 2;
+            let anguloAlvo = Math.atan2(mouseY - centroY, mouseX - centroX);
+            
+            // Suavizar a rotação da cobra
+            snake.angulo = anguloAlvo;
+
+            // Movimentar a cabeça
+            snake.x += Math.cos(snake.angulo) * snake.velocidade;
+            snake.y += Math.sin(snake.angulo) * snake.velocidade;
+
+            // Limites do mapa (paredes letais ou bordas)
+            if (snake.x < 0) snake.x = 0;
+            if (snake.x > MAP_SIZE) snake.x = MAP_SIZE;
+            if (snake.y < 0) snake.y = 0;
+            if (snake.y > MAP_SIZE) snake.y = MAP_SIZE;
+
+            // Atualizar o corpo (Efeito elástico do Slither)
+            snake.corpo.unshift({ x: snake.x, y: snake.y });
+            
+            // O tamanho do array do corpo define o comprimento da cobra
+            // Se comer uma orbe, não damos pop (a cobra cresce)
+            let comeu = false;
+            for (let i = orbes.length - 1; i >= 0; i--) {
+                let o = orbes[i];
+                let dist = Math.hypot(snake.x - o.x, snake.y - o.y);
+                if (dist < snake.raio + o.raio) {
+                    comeu = true;
+                    // Reposiciona a orbe comida
+                    orbes[i].x = Math.random() * MAP_SIZE;
+                    orbes[i].y = Math.random() * MAP_SIZE;
+                    break;
+                }
+            }
+
+            if (!comeu) {
+                snake.corpo.pop();
+            } else {
+                // Cresce e aumenta placar
+                placarEl.innerText = snake.corpo.length;
+            }
+        }
+
+        function desenhar() {
+            // Limpar tela
+            ctx.fillStyle = "#05050a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            // Câmera seguindo a cobra (Centralizada)
+            let camX = canvas.width / 2 - snake.x;
+            let camY = canvas.height / 2 - snake.y;
+            ctx.translate(camX, camY);
+
+            // Desenhar grade do mapa
+            ctx.strokeStyle = "#111122";
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= MAP_SIZE; x += 100) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); ctx.stroke();
+            }
+            for (let y = 0; y <= MAP_SIZE; y += 100) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); ctx.stroke();
+            }
+
+            // Desenhar Orbes
+            for (let o of orbes) {
+                ctx.fillStyle = o.cor;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = o.cor;
+                ctx.beginPath();
+                ctx.arc(o.x, o.y, o.raio, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0; // Resetar brilho
+
+            // Desenhar Corpo da Cobra
+            for (let i = snake.corpo.length - 1; i >= 0; i--) {
+                let parte = snake.corpo[i];
+                ctx.fillStyle = snake.cor;
+                ctx.beginPath();
+                ctx.arc(parte.x, parte.y, snake.raio, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Desenhar Cabeça com olhos
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(snake.x, snake.y, snake.raio, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            atualizar();
+            desenhar();
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
