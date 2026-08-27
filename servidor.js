@@ -9,11 +9,10 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(__dirname));
 
 let players = {};
-let bots = {};
 let foods = [];
 const MAP_SIZE = 6000;
 
-// Otimizado para 800 comidas para garantir fluidez total sem travar
+// Gera a comida inicial no mapa
 for (let i = 0; i < 800; i++) {
     foods.push({
         id: i,
@@ -21,31 +20,6 @@ for (let i = 0; i < 800; i++) {
         y: Math.random() * MAP_SIZE,
         color: ['#ff0055', '#ffe600', '#00f0ff', '#a855f7', '#00ff66', '#ff5500'][Math.floor(Math.random() * 6)]
     });
-}
-
-const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
-for (let i = 0; i < 15; i++) {
-    spawnBot(`bot_${i}`, botNames[i % botNames.length]);
-}
-
-function spawnBot(id, name) {
-    let bX = Math.random() * (MAP_SIZE - 1000) + 500;
-    let bY = Math.random() * (MAP_SIZE - 1000) + 500;
-    let bBody = [];
-    for (let j = 0; j < 35; j++) {
-        bBody.push({ x: bX, y: bY + (j * 4) });
-    }
-    bots[id] = {
-        id: id,
-        name: name,
-        x: bX,
-        y: bY,
-        angle: Math.random() * Math.PI * 2,
-        speed: 3.5,
-        body: bBody,
-        color: ['#ff0055', '#ffe600', '#a855f7', '#00ff66', '#00f0ff'][Math.floor(Math.random() * 5)],
-        changeTimer: 0
-    };
 }
 
 io.on('connection', (socket) => {
@@ -57,7 +31,8 @@ io.on('connection', (socket) => {
             y: data.y,
             angle: 0,
             body: data.body || [],
-            color: data.color || '#00f0ff'
+            color: data.color || '#00f0ff',
+            score: data.body ? data.body.length : 35
         };
     });
 
@@ -69,6 +44,8 @@ io.on('connection', (socket) => {
             players[socket.id].body = data.body;
             players[socket.id].color = data.color;
             players[socket.id].name = data.name;
+            // Atualiza a pontuação baseada no comprimento exato enviado pelo cliente
+            players[socket.id].score = data.body ? data.body.length : 35;
         }
     });
 
@@ -78,56 +55,24 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-    for (let id in bots) {
-        let bot = bots[id];
-        bot.changeTimer++;
-        if (bot.changeTimer > 90) {
-            bot.angle += (Math.random() - 0.5) * 2.5;
-            bot.changeTimer = 0;
-        }
-
-        bot.x += Math.cos(bot.angle) * bot.speed;
-        bot.y += Math.sin(bot.angle) * bot.speed;
-
-        if (bot.x < 100 || bot.x > MAP_SIZE - 100) bot.angle = Math.PI - bot.angle;
-        if (bot.y < 100 || bot.y > MAP_SIZE - 100) bot.angle = -bot.angle;
-
-        let targetX = bot.x;
-        let targetY = bot.y;
-        for (let i = 0; i < bot.body.length; i++) {
-            let part = bot.body[i];
-            let dx = targetX - part.x;
-            let dy = targetY - part.y;
-            let dist = Math.hypot(dx, dy);
-            if (dist > 12) {
-                let ang = Math.atan2(dy, dx);
-                part.x = targetX - Math.cos(ang) * 12;
-                part.y = targetY - Math.sin(ang) * 12;
-            }
-            targetX = part.x;
-            targetY = part.y;
-        }
-    }
-
-    let allEntities = { ...players, ...bots };
-
-    // Verificação de comida otimizada
-    for (let id in allEntities) {
-        let entity = allEntities[id];
-        if (!entity || !entity.body) continue;
+    // Verificação de colisão com a comida (processada centralmente)
+    for (let id in players) {
+        let p = players[id];
+        if (!p || !p.body) continue;
 
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
-            let dist = Math.hypot(entity.x - f.x, entity.y - f.y);
+            let dist = Math.hypot(p.x - f.x, p.y - f.y);
             if (dist < 20) {
-                let tail = entity.body[entity.body.length - 1];
-                entity.body.push({ x: tail.x, y: tail.y });
+                let tail = p.body[p.body.length - 1];
+                p.body.push({ x: tail.x, y: tail.y });
                 foods[i].x = Math.random() * MAP_SIZE;
                 foods[i].y = Math.random() * MAP_SIZE;
             }
         }
     }
 
+    // Verificação de bordas e colisões entre jogadores reais
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
@@ -138,8 +83,8 @@ setInterval(() => {
             continue;
         }
 
-        for (let oId in allEntities) {
-            let target = allEntities[oId];
+        for (let oId in players) {
+            let target = players[oId];
             if (!target || !target.body) continue;
 
             let startIdx = (pId === oId) ? 5 : 0;
@@ -162,8 +107,9 @@ setInterval(() => {
         }
     }
 
-    io.emit('server_update', { players, bots, foods });
+    // Envia o estado atualizado contendo apenas os dados dos jogadores reais e comidas
+    io.emit('server_update', { players, foods });
 }, 1000 / 60);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor 100% online rodando na porta ${PORT}`));
