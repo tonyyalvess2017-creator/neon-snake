@@ -77,6 +77,7 @@
         }
         #leaderboard h3 { font-size: 14px; color: #00f0ff; margin-bottom: 8px; text-align: center; letter-spacing: 1px; }
         .lb-row { display: flex; justify-content: space-between; margin-bottom: 5px; opacity: 0.85; }
+        .lb-row.me { color: #00f0ff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -289,7 +290,11 @@
             let allEntities = [];
             for (let id in serverData.players) {
                 let p = serverData.players[id];
-                allEntities.push({ name: p.name || 'Player', score: p.body ? p.body.length : 35 });
+                allEntities.push({
+                    id: id,
+                    name: p.name || 'Player',
+                    score: p.body ? p.body.length : 35
+                });
             }
 
             allEntities.sort((a, b) => b.score - a.score);
@@ -297,20 +302,9 @@
 
             lbList.innerHTML = '';
             top5.forEach((item, index) => {
-                lbList.innerHTML += `<div class="lb-row"><span>${index + 1}. ${item.name}</span><span>${item.score}</span></div>`;
+                let isMe = (item.id === socket.id);
+                lbList.innerHTML += `<div class="lb-row ${isMe ? 'me' : ''}"><span>${index + 1}. ${item.name}</span><span>${item.score}</span></div>`;
             });
-        }
-
-        function checkLocalCollisions() {
-            // Só começa a checar auto-colisão depois de 15 partes de distância da cabeça para evitar morte instantânea bugada
-            for (let i = 15; i < snake.body.length; i++) {
-                let part = snake.body[i];
-                let dist = Math.hypot(snake.x - part.x, snake.y - part.y);
-                if (dist < 12) {
-                    triggerDeath();
-                    break;
-                }
-            }
         }
 
         function triggerDeath() {
@@ -356,7 +350,7 @@
             snake.y += Math.sin(snake.angle) * snake.speed;
 
             // Borda do mapa
-            if (snake.x <= 30 || snake.x >= MAP_SIZE - 30 || snake.y <= 30 || snake.y >= MAP_SIZE - 30) {
+            if (snake.x <= 20 || snake.x >= MAP_SIZE - 20 || snake.y <= 20 || snake.y >= MAP_SIZE - 20) {
                 triggerDeath();
                 return;
             }
@@ -378,7 +372,8 @@
                 targetY = part.y;
             }
 
-            checkLocalCollisions();
+            // ATENÇÃO: A verificação de colisão com a própria cauda foi removida daqui! 
+            // Agora você não morre ao encostar em si mesmo.
 
             socket.emit('player_sync', {
                 x: snake.x, y: snake.y, angle: snake.angle,
@@ -415,7 +410,7 @@
                 }
             }
 
-            // Desenha apenas jogadores reais (Sem bots)
+            // Desenha outros jogadores reais online
             for (let id in serverData.players) {
                 if (id === socket.id) continue;
                 let p = serverData.players[id];
