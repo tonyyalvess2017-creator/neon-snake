@@ -1,1 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slither.io - Neon Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { background: #010105; color: white; font-family: 'Outfit', sans-serif; overflow: hidden; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; user-select: none; }
+        canvas { background: #050510; box-shadow: 0 0 80px rgba(0,0,0,0.95); border: 2px solid #151530; cursor: crosshair; }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center">
 
+    <!-- HUD Flutuante Estilizado -->
+    <div class="absolute top-5 left-5 bg-slate-950/80 border border-slate-800/80 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-5 backdrop-blur-md">
+        <div class="flex items-center gap-2">
+            <div id="status-conexao" class="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></div>
+            <span class="text-xs font-bold tracking-wider text-slate-400">REDE:</span>
+            <span id="txt-status" class="text-xs text-amber-400 font-bold">Conectando...</span>
+        </div>
+        <div class="h-4 w-[1px] bg-slate-800"></div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold tracking-wider text-slate-400">COMPRIMENTO:</span>
+            <span id="placar" class="text-cyan-400 font-extrabold text-base">35</span>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="1100" height="750"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const placarEl = document.getElementById("placar");
+        const statusEl = document.getElementById("status-conexao");
+        const txtStatusEl = document.getElementById("txt-status");
+
+        const socket = io("https://neon-snake-xzlj.onrender.com", {
+            transports: ['websocket', 'polling']
+        });
+
+        socket.on("connect", () => {
+            statusEl.classList.remove("bg-amber-400", "bg-red-500");
+            statusEl.classList.add("bg-emerald-400");
+            txtStatusEl.innerText = "Online";
+            txtStatusEl.classList.remove("text-amber-400", "text-red-400");
+            txtStatusEl.classList.add("text-emerald-400");
+        });
+
+        socket.on("disconnect", () => {
+            statusEl.classList.remove("bg-emerald-400");
+            statusEl.classList.add("bg-red-500");
+            txtStatusEl.innerText = "Queda";
+            txtStatusEl.classList.remove("text-emerald-400");
+            txtStatusEl.classList.add("text-red-400");
+        });
+
+        const MAP_SIZE = 5000;
+
+        let snake = {
+            x: MAP_SIZE / 2,
+            y: MAP_SIZE / 2,
+            angulo: 0,
+            velocidade: 3.4,
+            raio: 14,
+            cor: "#00f0ff",
+            corpo: []
+        };
+
+        const DIST_ELOS = 10;
+        for (let i = 0; i < 35; i++) {
+            snake.corpo.push({ x: snake.x, y: snake.y + (i * 4) });
+        }
+
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+
+        window.addEventListener("mousemove", (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Orbes com brilho intenso
+        let orbes = [];
+        const coresOrbes = ["#ff0055", "#ffe600", "#00f0ff", "#a855f7", "#00ff66"];
+        for (let i = 0; i < 700; i++) {
+            orbes.push({
+                x: Math.random() * MAP_SIZE,
+                y: Math.random() * MAP_SIZE,
+                raio: 4.5,
+                cor: coresOrbes[Math.floor(Math.random() * coresOrbes.length)]
+            });
+        }
+
+        let outrosJogadores = {};
+        socket.on("atualizar_arena", (dados) => { outrosJogadores = dados; });
+
+        function atualizar() {
+            const centroX = canvas.width / 2;
+            const centroY = canvas.height / 2;
+            let anguloAlvo = Math.atan2(mouseY - centroY, mouseX - centroX);
+
+            let diff = anguloAlvo - snake.angulo;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            snake.angulo += diff * 0.15;
+
+            snake.x += Math.cos(snake.angulo) * snake.velocidade;
+            snake.y += Math.sin(snake.angulo) * snake.velocidade;
+
+            if (snake.x < 30) snake.x = 30;
+            if (snake.x > MAP_SIZE - 30) snake.x = MAP_SIZE - 30;
+            if (snake.y < 30) snake.y = 30;
+            if (snake.y > MAP_SIZE - 30) snake.y = MAP_SIZE - 30;
+
+            // Corpo elástico fluido
+            let alvoX = snake.x;
+            let alvoY = snake.y;
+            for (let i = 0; i < snake.corpo.length; i++) {
+                let parte = snake.corpo[i];
+                let dx = alvoX - parte.x;
+                let dy = alvoY - parte.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist > DIST_ELOS) {
+                    let ang = Math.atan2(dy, dx);
+                    parte.x = alvoX - Math.cos(ang) * DIST_ELOS;
+                    parte.y = alvoY - Math.sin(ang) * DIST_ELOS;
+                }
+                alvoX = parte.x;
+                alvoY = parte.y;
+            }
+
+            // Coleta de Orbes
+            for (let i = orbes.length - 1; i >= 0; i--) {
+                let o = orbes[i];
+                if (Math.hypot(snake.x - o.x, snake.y - o.y) < snake.raio + o.raio) {
+                    orbes.splice(i, 1);
+                    orbes.push({
+                        x: Math.random() * MAP_SIZE,
+                        y: Math.random() * MAP_SIZE,
+                        raio: 4.5,
+                        cor: coresOrbes[Math.floor(Math.random() * coresOrbes.length)]
+                    });
+                    let ultimo = snake.corpo[snake.corpo.length - 1];
+                    snake.corpo.push({ x: ultimo.x, y: ultimo.y });
+                    placarEl.innerText = snake.corpo.length;
+                    break;
+                }
+            }
+
+            socket.emit("player_sync", { x: snake.x, y: snake.y, corpo: snake.corpo, cor: snake.cor });
+        }
+
+        function desenhar() {
+            ctx.fillStyle = "#03030b";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            let camX = canvas.width / 2 - snake.x;
+            let camY = canvas.height / 2 - snake.y;
+            ctx.translate(camX, camY);
+
+            // Grade geométrica refinada
+            ctx.strokeStyle = "#0d0d22";
+            ctx.lineWidth = 1.2;
+            for (let x = 0; x <= MAP_SIZE; x += 150) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); ctx.stroke();
+            }
+            for (let y = 0; y <= MAP_SIZE; y += 150) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); ctx.stroke();
+            }
+
+            // Borda do mapa com brilho
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = "#ff0055";
+            ctx.strokeStyle = "#ff0055";
+            ctx.lineWidth = 6;
+            ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+            ctx.shadowBlur = 0;
+
+            // Orbes brilhantes
+            for (let o of orbes) {
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = o.cor;
+                ctx.fillStyle = o.cor;
+                ctx.beginPath(); ctx.arc(o.x, o.y, o.raio, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // Outros jogadores
+            for (let id in outrosJogadores) {
+                if (id === socket.id) continue;
+                let p = outrosJogadores[id];
+                if (p.corpo) {
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = p.cor || "#ff0055";
+                    ctx.fillStyle = p.cor || "#ff0055";
+                    for (let parte of p.corpo) {
+                        ctx.beginPath(); ctx.arc(parte.x, parte.y, 13, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            }
+            ctx.shadowBlur = 0;
+
+            // Corpo da cobra com efeito gradiente de brilho e escama
+            for (let i = snake.corpo.length - 1; i >= 0; i--) {
+                let parte = snake.corpo[i];
+                let tamanhoElo = Math.max(8, snake.raio - (i * 0.08));
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = snake.cor;
+                ctx.fillStyle = snake.cor;
+                ctx.beginPath();
+                ctx.arc(parte.x, parte.y, tamanhoElo, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // Cabeça detalhada com olhos duplos estilo Slither
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = snake.cor;
+            ctx.fillStyle = snake.cor;
+            ctx.beginPath();
+            ctx.arc(snake.x, snake.y, snake.raio + 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Olhos orientados pela direção
+            ctx.fillStyle = "#ffffff";
+            let distOlho = 7;
+            let o1x = snake.x + Math.cos(snake.angulo - 0.55) * distOlho;
+            let o1y = snake.y + Math.sin(snake.angulo - 0.55) * distOlho;
+            let o2x = snake.x + Math.cos(snake.angulo + 0.55) * distOlho;
+            let o2y = snake.y + Math.sin(snake.angulo + 0.55) * distOlho;
+
+            ctx.beginPath(); ctx.arc(o1x, o1y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(o2x, o2y, 4, 0, Math.PI * 2); ctx.fill();
+
+            // Pupilas pretas
+            ctx.fillStyle = "#010105";
+            let pDist = 1.4;
+            ctx.beginPath(); ctx.arc(o1x + Math.cos(snake.angulo)*pDist, o1y + Math.sin(snake.angulo)*pDist, 1.8, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(o2x + Math.cos(snake.angulo)*pDist, o2y + Math.sin(snake.angulo)*pDist, 1.8, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            atualizar();
+            desenhar();
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
