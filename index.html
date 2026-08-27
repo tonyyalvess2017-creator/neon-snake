@@ -272,7 +272,8 @@
             hudEl.style.display = 'none';
             lbEl.style.display = 'none';
             
-            let earned = Math.floor(data.score / 5);
+            // Recompensa menor por morte (evita farm passivo)
+            let earned = Math.max(1, Math.floor(data.score / 20));
             playerCoins += earned;
             updateShopUI();
 
@@ -313,7 +314,7 @@
             lbEl.style.display = 'none';
             
             let finalScore = snake.body.length;
-            let earned = Math.floor(finalScore / 5);
+            let earned = Math.max(1, Math.floor(finalScore / 20));
             playerCoins += earned;
             updateShopUI();
 
@@ -371,9 +372,6 @@
                 targetX = part.x;
                 targetY = part.y;
             }
-
-            // ATENÇÃO: A verificação de colisão com a própria cauda foi removida daqui! 
-            // Agora você não morre ao encostar em si mesmo.
 
             socket.emit('player_sync', {
                 x: snake.x, y: snake.y, angle: snake.angle,
