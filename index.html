@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slither.io - Phaser Engine Pro</title>
-    <!-- Carrega a Engine Phaser.js Oficial -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
@@ -22,15 +21,10 @@
                 super('GameScene');
             }
 
-            preload() {
-                // Carregamento de assets programáticos se necessário
-            }
-
             create() {
                 this.cameras.main.setBackgroundColor('#03030b');
                 this.worldSize = 5000;
 
-                // Desenha a grade de fundo do mapa
                 this.graphics = this.add.graphics();
                 this.drawGrid();
 
@@ -43,15 +37,12 @@
                 }
 
                 socket.emit('join_game', { x: 2500, y: 2500, body: this.snakeBody, color: this.myColor });
-
                 this.otherPlayers = {};
-                this.foodGroup = this.add.group();
 
                 socket.on('server_tick', (data) => {
-                    this.updateServerData(data);
+                    this.otherPlayers = data.players;
                 });
 
-                // Câmera segue o jogador suavemente
                 this.cameras.main.setBounds(0, 0, this.worldSize, this.worldSize);
             }
 
@@ -70,7 +61,6 @@
                     this.graphics.strokePath();
                 }
 
-                // Borda vermelha do mapa
                 this.graphics.lineStyle(6, 0xff0055, 1);
                 this.graphics.strokeRect(0, 0, this.worldSize, this.worldSize);
             }
@@ -79,22 +69,19 @@
                 const pointer = this.input.activePointer;
                 const cam = this.cameras.main;
                 
-                // Converte posição do mouse para coordenadas do mundo
                 const worldMouseX = pointer.x + cam.scrollX;
                 const worldMouseY = pointer.y + cam.scrollY;
 
                 let head = this.snakeBody[0];
                 let angle = Math.atan2(worldMouseY - head.y, worldMouseX - head.x);
-                let speed = 3.5;
+                let speed = 4;
 
                 head.x += Math.cos(angle) * speed;
                 head.y += Math.sin(angle) * speed;
 
-                // Limites
                 head.x = Phaser.Math.Clamp(head.x, 30, this.worldSize - 30);
                 head.y = Phaser.Math.Clamp(head.y, 30, this.worldSize - 30);
 
-                // Física do corpo elástico
                 let targetX = head.x;
                 let targetY = head.y;
                 for (let i = 1; i < this.snakeBody.length; i++) {
@@ -103,19 +90,17 @@
                     let dy = targetY - part.y;
                     let dist = Math.hypot(dx, dy);
 
-                    if (dist > 10) {
+                    if (dist > 12) {
                         let a = Math.atan2(dy, dx);
-                        part.x = targetX - Math.cos(a) * 10;
-                        part.y = targetY - Math.sin(a) * 10;
+                        part.x = targetX - Math.cos(a) * 12;
+                        part.y = targetY - Math.sin(a) * 12;
                     }
                     targetX = part.x;
                     targetY = part.y;
                 }
 
-                // Câmera segue a cabeça
                 cam.centerOn(head.x, head.y);
 
-                // Envia dados para o servidor
                 socket.emit('player_update', {
                     x: head.x,
                     y: head.y,
@@ -124,21 +109,19 @@
                     body: this.snakeBody
                 });
 
-                // Redesenha elementos visuais locais
                 this.renderGame(angle);
             }
 
             renderGame(angle) {
-                // Limpa e redesenha o corpo do jogador na tela com gráficos vetoriais do Phaser
                 if (!this.myGraphics) {
                     this.myGraphics = this.add.graphics();
                 }
                 this.myGraphics.clear();
 
-                // Desenha corpo
-                for (let i = this.snakeBody.length - 1; i >= 0; i5, i--) {
+                // Desenha o corpo do jogador fluido
+                for (let i = this.snakeBody.length - 1; i >= 0; i--) {
                     let p = this.snakeBody[i];
-                    let radius = Math.max(8, 14 - (i * 0.08));
+                    let radius = Math.max(8, 15 - (i * 0.08));
                     this.myGraphics.fillStyle(Phaser.Display.Color.HexStringToColor(this.myColor).color, 1);
                     this.myGraphics.fillCircle(p.x, p.y, radius);
                 }
@@ -148,7 +131,7 @@
                 this.myGraphics.fillStyle(Phaser.Display.Color.HexStringToColor(this.myColor).color, 1);
                 this.myGraphics.fillCircle(head.x, head.y, 16);
 
-                // Olhos
+                // Olhos dinâmicos
                 let d = 7;
                 let o1x = head.x + Math.cos(angle - 0.55) * d;
                 let o1y = head.y + Math.sin(angle - 0.55) * d;
@@ -158,10 +141,22 @@
                 this.myGraphics.fillStyle(0xffffff, 1);
                 this.myGraphics.fillCircle(o1x, o1y, 4);
                 this.myGraphics.fillCircle(o2x, o2y, 4);
-            }
 
-            updateServerData(data) {
-                // Renderiza comida e outros jogadores recebidos do servidor com alta fluidez
+                this.myGraphics.fillStyle(0x010105, 1);
+                this.myGraphics.fillCircle(o1x + Math.cos(angle)*1.5, o1y + Math.sin(angle)*1.5, 1.8);
+                this.myGraphics.fillCircle(o2x + Math.cos(angle)*1.5, o2y + Math.sin(angle)*1.5, 1.8);
+
+                // Renderiza outros jogadores conectados
+                for (let id in this.otherPlayers) {
+                    if (id === socket.id) continue;
+                    let p = this.otherPlayers[id];
+                    if (p && p.body) {
+                        for (let part of p.body) {
+                            this.myGraphics.fillStyle(Phaser.Display.Color.HexStringToColor(p.color || '#ff0055').color, 1);
+                            this.myGraphics.fillCircle(part.x, part.y, 14);
+                        }
+                    }
+                }
             }
         }
 
@@ -174,6 +169,10 @@
         };
 
         const game = new Phaser.Game(config);
+
+        window.addEventListener('resize', () => {
+            game.scale.resize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
