@@ -10,29 +10,30 @@
         body, html { width: 100%; height: 100%; background: #020208; overflow: hidden; font-family: system-ui, sans-serif; }
         canvas { display: block; width: 100vw; height: 100vh; background: #050510; }
         
-        /* Menu forçado com z-index máximo */
-        #menu-overlay {
+        #menu-overlay, #gameover-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(2, 2, 8, 0.95); backdrop-filter: blur(15px);
             display: flex; justify-content: center; align-items: center; z-index: 9999;
         }
+        #gameover-overlay { display: none; }
         .menu-card {
             background: rgba(10, 10, 25, 0.95); border: 1px solid rgba(255,255,255,0.15);
-            padding: 40px; border-radius: 20px; width: 380px; text-align: center;
+            padding: 35px; border-radius: 20px; width: 400px; text-align: center;
             box-shadow: 0 20px 50px rgba(0,0,0,0.9);
         }
-        .menu-card h1 { color: #fff; font-size: 28px; margin-bottom: 25px; letter-spacing: 2px; }
+        .menu-card h1 { color: #fff; font-size: 26px; margin-bottom: 20px; letter-spacing: 2px; }
         .menu-input {
-            width: 100%; padding: 14px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 10px; color: #fff; font-size: 16px; margin-bottom: 20px; outline: none; text-align: center;
+            width: 100%; padding: 12px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 10px; color: #fff; font-size: 15px; margin-bottom: 15px; outline: none; text-align: center;
         }
-        .skin-selector { display: flex; justify-content: center; gap: 12px; margin-bottom: 25px; }
+        .skin-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
         .skin-ball {
-            width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
-            transition: transform 0.2s;
+            width: 45px; height: 45px; border-radius: 12px; cursor: pointer; border: 2px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; font-weight: bold;
         }
-        .skin-ball:hover { transform: scale(1.15); }
-        .skin-ball.selected { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 15px currentColor; }
+        .skin-ball:hover { transform: scale(1.1); }
+        .skin-ball.selected { border-color: #00f0ff; transform: scale(1.15); box-shadow: 0 0 15px #00f0ff; }
+        
         .btn-play {
             width: 100%; padding: 14px; background: linear-gradient(135deg, #00f0ff, #0077ff);
             border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 700;
@@ -48,7 +49,6 @@
         }
         .hud-item span { color: #00f0ff; font-weight: 700; }
 
-        /* Leaderboard / Tabela de Pontuação */
         #leaderboard {
             position: fixed; top: 20px; right: 20px; z-index: 10;
             background: rgba(5, 5, 15, 0.85); border: 1px solid rgba(255,255,255,0.1);
@@ -61,25 +61,41 @@
 </head>
 <body>
 
+    <!-- Menu Principal com Skins Estendidas -->
     <div id="menu-overlay">
         <div class="menu-card">
             <h1>NEON SNAKE</h1>
             <input type="text" id="nickname-input" class="menu-input" placeholder="Digite seu Nickname" maxlength="15" value="Player">
-            <div class="skin-selector">
-                <div class="skin-ball selected" style="background: #00f0ff;" data-color="#00f0ff"></div>
-                <div class="skin-ball" style="background: #ff0055;" data-color="#ff0055"></div>
-                <div class="skin-ball" style="background: #ffe600;" data-color="#ffe600"></div>
-                <div class="skin-ball" style="background: #a855f7;" data-color="#a855f7"></div>
-                <div class="skin-ball" style="background: #00ff66;" data-color="#00ff66"></div>
+            <p style="color: #aaa; font-size: 12px; margin-bottom: 8px; text-align: left;">ESCOLHA SUA SKIN:</p>
+            <div class="skin-grid">
+                <div class="skin-ball selected" style="background: #00f0ff;" data-color="#00f0ff">Cyan</div>
+                <div class="skin-ball" style="background: #ff0055;" data-color="#ff0055">Pink</div>
+                <div class="skin-ball" style="background: #ffe600;" data-color="#ffe600">Gold</div>
+                <div class="skin-ball" style="background: #a855f7;" data-color="#a855f7">Purple</div>
+                <div class="skin-ball" style="background: #00ff66;" data-color="#00ff66">Neon</div>
+                <div class="skin-ball" style="background: linear-gradient(45deg, #ff0000, #ff7700);" data-color="#ff4400">Fire</div>
+                <div class="skin-ball" style="background: linear-gradient(45deg, #00ffcc, #0033ff);" data-color="#0088ff">Deep</div>
+                <div class="skin-ball" style="background: linear-gradient(45deg, #ff00ff, #7700ff);" data-color="#cc00ff">Magic</div>
+                <div class="skin-ball" style="background: #ffffff;" data-color="#ffffff">Ghost</div>
+                <div class="skin-ball" style="background: #333333; border-color: #666;" data-color="#555555">Void</div>
             </div>
             <button class="btn-play" id="play-btn">JOGAR AGORA</button>
+        </div>
+    </div>
+
+    <!-- Tela de Game Over -->
+    <div id="gameover-overlay">
+        <div class="menu-card">
+            <h1 style="color: #ff0055;">VOCÊ MORREU!</h1>
+            <p id="final-score" style="color: #fff; margin-bottom: 20px; font-size: 16px;">Comprimento final: 35</p>
+            <button class="btn-play" id="respawn-btn">JOGAR NOVAMENTE</button>
         </div>
     </div>
 
     <div id="hud">
         <div class="hud-item">STATUS: <span id="net-status" style="color: #fbbf24;">Conectando...</span></div>
         <div style="width: 1px; height: 15px; background: rgba(255,255,255,0.1);"></div>
-        <div class="hud-item">COMPRIMENTO: <span id="score-val">30</span></div>
+        <div class="hud-item">COMPRIMENTO: <span id="score-val">35</span></div>
     </div>
 
     <div id="leaderboard">
@@ -95,11 +111,14 @@
         const scoreEl = document.getElementById("score-val");
         const statusEl = document.getElementById("net-status");
         const menuOverlay = document.getElementById("menu-overlay");
+        const gameoverOverlay = document.getElementById("gameover-overlay");
         const hudEl = document.getElementById("hud");
         const lbEl = document.getElementById("leaderboard");
         const lbList = document.getElementById("lb-list");
         const playBtn = document.getElementById("play-btn");
+        const respawnBtn = document.getElementById("respawn-btn");
         const nickInput = document.getElementById("nickname-input");
+        const finalScoreEl = document.getElementById("final-score");
 
         let selectedColor = "#00f0ff";
         let playerName = "Player";
@@ -108,8 +127,8 @@
         document.querySelectorAll('.skin-ball').forEach(ball => {
             ball.addEventListener('click', (e) => {
                 document.querySelectorAll('.skin-ball').forEach(b => b.classList.remove('selected'));
-                e.target.classList.add('selected');
-                selectedColor = e.target.getAttribute('data-color');
+                e.currentTarget.classList.add('selected');
+                selectedColor = e.currentTarget.getAttribute('data-color');
             });
         });
 
@@ -133,10 +152,15 @@
             angle: 0, speed: 4, radius: 14, body: []
         };
 
-        const LINK_DIST = 12;
-        for (let i = 0; i < 35; i++) {
-            snake.body.push({ x: snake.x, y: snake.y + (i * 4) });
+        function resetSnake() {
+            snake.x = Math.random() * 4000 + 1000;
+            snake.y = Math.random() * 4000 + 1000;
+            snake.body = [];
+            for (let i = 0; i < 35; i++) {
+                snake.body.push({ x: snake.x, y: snake.y + (i * 4) });
+            }
         }
+        resetSnake();
 
         let mouseX = window.innerWidth / 2;
         let mouseY = window.innerHeight / 2;
@@ -147,13 +171,26 @@
             mouseY = e.clientY;
         });
 
-        playBtn.addEventListener('click', () => {
+        function startGame() {
             playerName = nickInput.value.trim() || "Player";
             menuOverlay.style.display = 'none';
+            gameoverOverlay.style.display = 'none';
             hudEl.style.display = 'flex';
             lbEl.style.display = 'block';
+            resetSnake();
             gameStarted = true;
             socket.emit('player_join', { x: snake.x, y: snake.y, body: snake.body, color: selectedColor, name: playerName });
+        }
+
+        playBtn.addEventListener('click', startGame);
+        respawnBtn.addEventListener('click', startGame);
+
+        socket.on('player_died', () => {
+            gameStarted = false;
+            hudEl.style.display = 'none';
+            lbEl.style.display = 'none';
+            finalScoreEl.innerText = `Comprimento final: ${snake.body.length}`;
+            gameoverOverlay.style.display = 'flex';
         });
 
         socket.on('server_update', (data) => {
@@ -163,15 +200,13 @@
 
         function updateLeaderboard() {
             let allEntities = [];
-            // Adiciona players
             for (let id in serverData.players) {
                 let p = serverData.players[id];
-                allEntities.push({ name: p.name || 'Player', score: p.body ? p.body.length : 30 });
+                allEntities.push({ name: p.name || 'Player', score: p.body ? p.body.length : 35 });
             }
-            // Adiciona bots
             for (let id in serverData.bots) {
                 let b = serverData.bots[id];
-                allEntities.push({ name: b.name, score: b.body ? b.body.length : 30 });
+                allEntities.push({ name: b.name, score: b.body ? b.body.length : 35 });
             }
 
             allEntities.sort((a, b) => b.score - a.score);
@@ -208,9 +243,6 @@
             snake.x += Math.cos(snake.angle) * snake.speed;
             snake.y += Math.sin(snake.angle) * snake.speed;
 
-            snake.x = Math.max(30, Math.min(MAP_SIZE - 30, snake.x));
-            snake.y = Math.max(30, Math.min(MAP_SIZE - 30, snake.y));
-
             let targetX = snake.x;
             let targetY = snake.y;
             for (let i = 0; i < snake.body.length; i++) {
@@ -219,10 +251,10 @@
                 let dy = targetY - part.y;
                 let dist = Math.hypot(dx, dy);
 
-                if (dist > LINK_DIST) {
+                if (dist > 12) {
                     let ang = Math.atan2(dy, dx);
-                    part.x = targetX - Math.cos(ang) * LINK_DIST;
-                    part.y = targetY - Math.sin(ang) * LINK_DIST;
+                    part.x = targetX - Math.cos(ang) * 12;
+                    part.y = targetY - Math.sin(ang) * 12;
                 }
                 targetX = part.x;
                 targetY = part.y;
@@ -230,7 +262,7 @@
 
             socket.emit('player_sync', {
                 x: snake.x, y: snake.y, angle: snake.angle,
-                score: snake.body.length, body: snake.body, name: playerName, color: selectedColor
+                body: snake.body, name: playerName, color: selectedColor
             });
         }
 
@@ -265,7 +297,7 @@
                 }
             }
 
-            // Renderiza Bots na Tela
+            // Bots
             for (let id in serverData.bots) {
                 let b = serverData.bots[id];
                 if (b && b.body) {
@@ -309,6 +341,7 @@
             ctx.fillStyle = selectedColor;
             ctx.beginPath(); ctx.arc(snake.x, snake.y, snake.radius + 2, 0, Math.PI * 2); ctx.fill();
 
+            // Olhos
             let eyeOffset = 7;
             let e1x = snake.x + Math.cos(snake.angle - 0.55) * eyeOffset;
             let e1y = snake.y + Math.sin(snake.angle - 0.55) * eyeOffset;
