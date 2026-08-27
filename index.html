@@ -14,34 +14,41 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(20, 20, 20, 0.9);
+            background: rgba(20, 20, 20, 0.95);
             padding: 30px;
-            border-radius: 10px;
+            border-radius: 12px;
             text-align: center;
             color: #fff;
             border: 2px solid #00f0ff;
             z-index: 10;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
         }
+        #menu h2 { margin-bottom: 15px; color: #00f0ff; letter-spacing: 1px; }
         #menu input {
-            padding: 10px;
+            padding: 12px;
             font-size: 16px;
-            border-radius: 5px;
-            border: none;
+            border-radius: 6px;
+            border: 1px solid #444;
+            background: #222;
+            color: #fff;
             margin-bottom: 15px;
-            width: 200px;
+            width: 220px;
             text-align: center;
+            outline: none;
         }
+        #menu input:focus { border-color: #00f0ff; }
         #menu button {
-            padding: 10px 20px;
+            padding: 12px 25px;
             font-size: 16px;
             background: #00f0ff;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
             color: #000;
+            transition: 0.2s;
         }
-        #menu button:hover { background: #00bcd4; }
+        #menu button:hover { background: #00bcd4; transform: scale(1.05); }
 
         /* Placar e HUD */
         #hud {
@@ -53,6 +60,7 @@
             pointer-events: none;
             z-index: 5;
             display: none;
+            text-shadow: 2px 2px 4px #000;
         }
     </style>
 </head>
@@ -69,7 +77,7 @@
 
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Importação do Socket.IO fornecido pelo servidor Node.js -->
+    <!-- Importação do Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -84,7 +92,7 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        const MAP_SIZE = 6000; // Mesmo tamanho de mapa configurado no server.js
+        const MAP_SIZE = 6000;
 
         let gameStarted = false;
         let mouseX = window.innerWidth / 2;
@@ -104,7 +112,6 @@
         let serverBots = {};
         let serverFoods = [];
 
-        // Captura o movimento do mouse para guiar a cobra
         window.addEventListener('mousemove', (e) => {
             mouseX = e.clientX;
             mouseY = e.clientY;
@@ -118,7 +125,6 @@
             player.x = Math.random() * 2000 + 2000;
             player.y = Math.random() * 2000 + 2000;
 
-            // Cria corpo inicial com 35 partes
             player.body = [];
             for (let i = 0; i < 35; i++) {
                 player.body.push({ x: player.x, y: player.y + (i * 4) });
@@ -137,40 +143,35 @@
             });
         });
 
-        // Ouve atualizações do servidor
         socket.on('server_update', (data) => {
             serverPlayers = data.players;
             serverBots = data.bots;
             serverFoods = data.foods;
         });
 
-        // Caso o jogador morra
         socket.on('player_died', (data) => {
-            alert('Você morreu! Sua pontuação final foi: ' + data.score);
+            let moedasGanhas = Math.floor(data.score / 5);
+            alert('Você morreu! Pontuação final: ' + data.score + '\n+' + moedasGanhas + ' Moedas ganhas na partida!');
             location.reload();
         });
 
-        // Loop de Renderização e Física local do Cliente
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (gameStarted) {
-                // Calcula o ângulo em direção ao mouse
                 let centerX = canvas.width / 2;
                 let centerY = canvas.height / 2;
                 let dx = mouseX - centerX;
                 let dy = mouseY - centerY;
                 player.angle = Math.atan2(dy, dx);
 
-                // Move a cabeça
                 player.x += Math.cos(player.angle) * player.speed;
                 player.y += Math.sin(player.angle) * player.speed;
 
-                // TRAVA DE BORDA RIGIDA NO CLIENTE (Impede atravessar para fora)
+                // Trava limite na cliente
                 player.x = Math.max(50, Math.min(MAP_SIZE - 50, player.x));
                 player.y = Math.max(50, Math.min(MAP_SIZE - 50, player.y));
 
-                // Atualiza a física do corpo seguindo a cabeça
                 let targetX = player.x;
                 let targetY = player.y;
                 for (let i = 0; i < player.body.length; i++) {
@@ -187,7 +188,6 @@
                     targetY = part.y;
                 }
 
-                // Envia sincronização para o servidor
                 socket.emit('player_sync', {
                     x: player.x,
                     y: player.y,
@@ -198,70 +198,63 @@
                 });
 
                 document.getElementById('score').innerText = player.body.length;
-            }
 
-            // Câmera focada no jogador
-            let camX = gameStarted ? player.x - canvas.width / 2 : 0;
-            let camY = gameStarted ? player.y - canvas.height / 2 : 0;
+                // Renderização da câmera e do mundo de jogo
+                let camX = player.x - canvas.width / 2;
+                let camY = player.y - canvas.height / 2;
 
-            ctx.save();
-            ctx.translate(-camX, -camY);
+                ctx.save();
+                ctx.translate(-camX, -camY);
 
-            // Desenha as bordas do mapa
-            ctx.strokeStyle = '#ff0055';
-            ctx.lineWidth = 10;
-            ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+                // Borda do mapa
+                ctx.strokeStyle = '#ff0055';
+                ctx.lineWidth = 10;
+                ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-            // Desenha a Comida
-            if (serverFoods) {
-                serverFoods.forEach(f => {
-                    ctx.fillStyle = f.color;
-                    ctx.beginPath();
-                    ctx.arc(f.x, f.y, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-            }
-
-            // Função auxiliar para desenhar cobras (Jogadores e Bots)
-            function drawSnake(snake) {
-                if (!snake.body) return;
-                for (let i = snake.body.length - 1; i >= 0; i--) {
-                    let part = snake.body[i];
-                    ctx.fillStyle = snake.color || '#00f0ff';
-                    ctx.beginPath();
-                    ctx.arc(part.x, part.y, i === 0 ? 14 : 12, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#000';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
+                // Comida
+                if (serverFoods) {
+                    serverFoods.forEach(f => {
+                        ctx.fillStyle = f.color;
+                        ctx.beginPath();
+                        ctx.arc(f.x, f.y, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
                 }
-                // Nome do jogador/bot
-                if (snake.name && snake.body[0]) {
-                    ctx.fillStyle = '#fff';
-                    ctx.font = '14px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(snake.name, snake.body[0].x, snake.body[0].y - 20);
+
+                function drawSnake(snake) {
+                    if (!snake.body) return;
+                    for (let i = snake.body.length - 1; i >= 0; i--) {
+                        let part = snake.body[i];
+                        ctx.fillStyle = snake.color || '#00f0ff';
+                        ctx.beginPath();
+                        ctx.arc(part.x, part.y, i === 0 ? 14 : 12, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#000';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                    if (snake.name && snake.body[0]) {
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '14px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(snake.name, snake.body[0].x, snake.body[0].y - 20);
+                    }
                 }
-            }
 
-            // Desenha Bots
-            for (let id in serverBots) {
-                drawSnake(serverBots[id]);
-            }
-
-            // Desenha Outros Jogadores
-            for (let id in serverPlayers) {
-                if (id !== socket.id) {
-                    drawSnake(serverPlayers[id]);
+                for (let id in serverBots) {
+                    drawSnake(serverBots[id]);
                 }
-            }
 
-            // Desenha o Próprio Jogador
-            if (gameStarted) {
+                for (let id in serverPlayers) {
+                    if (id !== socket.id) {
+                        drawSnake(serverPlayers[id]);
+                    }
+                }
+
                 drawSnake(player);
+                ctx.restore();
             }
 
-            ctx.restore();
             requestAnimationFrame(gameLoop);
         }
 
