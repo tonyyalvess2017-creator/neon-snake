@@ -13,6 +13,7 @@ let bots = {};
 let foods = [];
 const MAP_SIZE = 6000;
 
+// Inicializa a comida espalhada pelo mapa
 for (let i = 0; i < 2000; i++) {
     foods.push({
         id: i,
@@ -22,6 +23,7 @@ for (let i = 0; i < 2000; i++) {
     });
 }
 
+// Criação de Bots
 const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
 for (let i = 0; i < 20; i++) {
     spawnBot(`bot_${i}`, botNames[i % botNames.length]);
@@ -76,7 +78,9 @@ io.on('connection', (socket) => {
     });
 });
 
+// Loop principal do servidor (60 FPS)
 setInterval(() => {
+    // Atualização de movimentação dos Bots
     for (let id in bots) {
         let bot = bots[id];
         bot.changeTimer++;
@@ -110,6 +114,7 @@ setInterval(() => {
 
     let allEntities = { ...players, ...bots };
 
+    // Consumo de comida normal pelo mapa
     for (let id in allEntities) {
         let entity = allEntities[id];
         if (!entity || !entity.body) continue;
@@ -117,46 +122,67 @@ setInterval(() => {
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
             let dist = Math.hypot(entity.x - f.x, entity.y - f.y);
-            if (dist < 20) {
+            if (dist < 22) {
+                // Cresce a cobra adicionando gomos baseados na comida consumida
                 let tail = entity.body[entity.body.length - 1];
                 entity.body.push({ x: tail.x, y: tail.y });
+                
+                // Recicla a comida no mapa
                 foods[i].x = Math.random() * MAP_SIZE;
                 foods[i].y = Math.random() * MAP_SIZE;
             }
         }
     }
 
+    // Processamento de colisões PVP, mortes e conversão do corpo em massa/comida
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
 
+        // Morte por colisão com as bordas do mapa
         if (p.x <= 30 || p.x >= MAP_SIZE - 30 || p.y <= 30 || p.y >= MAP_SIZE - 30) {
-            io.to(pId).emit('player_died', { score: p.body.length });
+            let finalScore = p.body.length;
+            p.body.forEach((pt, index) => {
+                if (index % 2 === 0) {
+                    foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
+                }
+            });
+            io.to(pId).emit('player_died', { score: finalScore });
             delete players[pId];
             continue;
         }
 
+        let morreu = false;
         for (let oId in allEntities) {
             let target = allEntities[oId];
             if (!target || !target.body) continue;
 
-            let startIdx = (pId === oId) ? 5 : 0;
+            // Ignora os primeiros segmentos da própria cabeça para evitar auto-colisão instantânea
+            let startIdx = (pId === oId) ? 6 : 0;
+            
             for (let i = startIdx; i < target.body.length; i++) {
                 let part = target.body[i];
                 let dist = Math.hypot(p.x - part.x, p.y - part.y);
-                if (dist < 14) {
-                    let finalScore = p.body.length;
-                    p.body.forEach((pt, index) => {
-                        if (index % 2 === 0) {
-                            foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
-                        }
-                    });
-                    io.to(pId).emit('player_died', { score: finalScore });
-                    delete players[pId];
+                
+                // Hitbox precisa de 12px para evitar atravessamentos falsos
+                if (dist < 12) {
+                    morreu = true;
                     break;
                 }
             }
-            if (!players[pId]) break;
+            if (morreu) break;
+        }
+
+        if (morreu) {
+            let finalScore = p.body.length;
+            // Transforma todo o corpo da cobra derrotada em bolinhas coloridas (massa absorvível) espalhadas
+            p.body.forEach((pt, index) => {
+                if (index % 2 === 0) {
+                    foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
+                }
+            });
+            io.to(pId).emit('player_died', { score: finalScore });
+            delete players[pId];
         }
     }
 
