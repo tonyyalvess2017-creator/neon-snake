@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slither.io - Enterprise Engine Pro</title>
-    <!-- Usando a mesma rota local do socket.io para evitar conflito de versão com o servidor -->
     <script src="/socket.io/socket.io.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -221,7 +220,6 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Conectando dinamicamente ao host atual (funciona local e no Render)
         const socket = io();
 
         socket.on("connect", () => {
@@ -247,7 +245,7 @@
 
         let mouseX = window.innerWidth / 2;
         let mouseY = window.innerHeight / 2;
-        let serverData = { players: {}, bots: {}, foods: [] };
+        let serverData = { players: {}, foods: [] };
 
         window.addEventListener("mousemove", (e) => {
             mouseX = e.clientX;
@@ -293,10 +291,6 @@
                 let p = serverData.players[id];
                 allEntities.push({ name: p.name || 'Player', score: p.body ? p.body.length : 35 });
             }
-            for (let id in serverData.bots) {
-                let b = serverData.bots[id];
-                allEntities.push({ name: b.name, score: b.body ? b.body.length : 35 });
-            }
 
             allEntities.sort((a, b) => b.score - a.score);
             let top5 = allEntities.slice(0, 5);
@@ -305,6 +299,35 @@
             top5.forEach((item, index) => {
                 lbList.innerHTML += `<div class="lb-row"><span>${index + 1}. ${item.name}</span><span>${item.score}</span></div>`;
             });
+        }
+
+        function checkLocalCollisions() {
+            // Só começa a checar auto-colisão depois de 15 partes de distância da cabeça para evitar morte instantânea bugada
+            for (let i = 15; i < snake.body.length; i++) {
+                let part = snake.body[i];
+                let dist = Math.hypot(snake.x - part.x, snake.y - part.y);
+                if (dist < 12) {
+                    triggerDeath();
+                    break;
+                }
+            }
+        }
+
+        function triggerDeath() {
+            gameStarted = false;
+            hudEl.style.display = 'none';
+            lbEl.style.display = 'none';
+            
+            let finalScore = snake.body.length;
+            let earned = Math.floor(finalScore / 5);
+            playerCoins += earned;
+            updateShopUI();
+
+            socket.emit('player_died_notify', { score: finalScore });
+
+            finalScoreEl.innerText = `Comprimento final: ${finalScore}`;
+            earnedCoinsEl.innerText = `+${earned} Moedas ganhas na partida!`;
+            gameoverOverlay.style.display = 'flex';
         }
 
         function update() {
@@ -332,6 +355,12 @@
             snake.x += Math.cos(snake.angle) * snake.speed;
             snake.y += Math.sin(snake.angle) * snake.speed;
 
+            // Borda do mapa
+            if (snake.x <= 30 || snake.x >= MAP_SIZE - 30 || snake.y <= 30 || snake.y >= MAP_SIZE - 30) {
+                triggerDeath();
+                return;
+            }
+
             let targetX = snake.x;
             let targetY = snake.y;
             for (let i = 0; i < snake.body.length; i++) {
@@ -348,6 +377,8 @@
                 targetX = part.x;
                 targetY = part.y;
             }
+
+            checkLocalCollisions();
 
             socket.emit('player_sync', {
                 x: snake.x, y: snake.y, angle: snake.angle,
@@ -384,20 +415,7 @@
                 }
             }
 
-            for (let id in serverData.bots) {
-                let b = serverData.bots[id];
-                if (b && b.body) {
-                    ctx.fillStyle = b.color;
-                    for (let part of b.body) {
-                        ctx.beginPath(); ctx.arc(part.x, part.y, 13, 0, Math.PI * 2); ctx.fill();
-                    }
-                    ctx.fillStyle = "#ffffff";
-                    ctx.font = "12px system-ui";
-                    ctx.textAlign = "center";
-                    ctx.fillText(b.name, b.x, b.y - 22);
-                }
-            }
-
+            // Desenha apenas jogadores reais (Sem bots)
             for (let id in serverData.players) {
                 if (id === socket.id) continue;
                 let p = serverData.players[id];
