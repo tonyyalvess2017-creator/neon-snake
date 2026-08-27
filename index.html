@@ -21,7 +21,7 @@
         <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
             <div>
                 <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (MUNDO LIVRE)</h1>
-                <p class="text-xs text-slate-400">Comida inteligente próxima de você & Controles otimizados!</p>
+                <p class="text-xs text-slate-400">Jogabilidade ultra fluida para Teclado e Controle Xbox!</p>
             </div>
             <div class="flex gap-4">
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- Lógica do Jogo -->
+    <!-- Lógica Otimizada do Jogo -->
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -90,14 +90,15 @@
 
         let posX = 1250;
         let posY = 1250;
-        let direcao = "RIGHT";
-        let proximaDirecao = "RIGHT"; // Evita bugs de clique rápido
+        let velX = 4; // Velocidade fluida em X
+        let velY = 0; // Velocidade fluida em Y
+        let ultimaDirecao = "RIGHT";
+        
         let corpo = [];
         let comprimentoDesejado = 15;
         let moedasCount = 0;
         let minhaCor = "#06b6d4";
 
-        // Comida inicial perto do jogador
         let comida = { x: posX + 150, y: posY + 100, cor: "#f43f5e" };
         let outrosJogadores = {};
 
@@ -111,38 +112,47 @@
             }
         }
 
-        // Evento de Teclado
+        // Sistema de Teclado Fluido
         window.addEventListener("keydown", (e) => {
-            if ((e.key === "ArrowUp" || e.key === "w" || e.key === "W") && direcao !== "DOWN") proximaDirecao = "UP";
-            if ((e.key === "ArrowDown" || e.key === "s" || e.key === "S") && direcao !== "UP") proximaDirecao = "DOWN";
-            if ((e.key === "ArrowLeft" || e.key === "a" || e.key === "A") && direcao !== "RIGHT") proximaDirecao = "LEFT";
-            if ((e.key === "ArrowRight" || e.key === "d" || e.key === "D") && direcao !== "LEFT") proximaDirecao = "RIGHT";
+            if ((e.key === "ArrowUp" || e.key === "w" || e.key === "W") && ultimaDirecao !== "DOWN") {
+                velX = 0; velY = -4; ultimaDirecao = "UP";
+            }
+            if ((e.key === "ArrowDown" || e.key === "s" || e.key === "S") && ultimaDirecao !== "UP") {
+                velX = 0; velY = 4; ultimaDirecao = "DOWN";
+            }
+            if ((e.key === "ArrowLeft" || e.key === "a" || e.key === "A") && ultimaDirecao !== "RIGHT") {
+                velX = -4; velY = 0; ultimaDirecao = "LEFT";
+            }
+            if ((e.key === "ArrowRight" || e.key === "d" || e.key === "D") && ultimaDirecao !== "LEFT") {
+                velX = 4; velY = 0; ultimaDirecao = "RIGHT";
+            }
         });
 
-        // Suporte Otimizado para Controle Xbox (Gamepads)
+        // Suporte Direto e Preciso ao Analógico do Controle Xbox
         function lerControleXbox() {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             if (!gamepads[0]) return;
             const gp = gamepads[0];
             
-            // Analógico esquerdo (eixos 0 e 1) com zona morta de 0.3 para evitar movimento fantasma
             const eixoX = gp.axes[0];
             const eixoY = gp.axes[1];
-            const deadzone = 0.3;
+            const deadzone = 0.25;
 
-            if (Math.abs(eixoX) > Math.abs(eixoY)) {
-                if (eixoX > deadzone && direcao !== "LEFT") proximaDirecao = "RIGHT";
-                else if (eixoX < -deadzone && direcao !== "RIGHT") proximaDirecao = "LEFT";
-            } else {
-                if (eixoY > deadzone && direcao !== "UP") proximaDirecao = "DOWN";
-                else if (eixoY < -deadzone && direcao !== "DOWN") proximaDirecao = "UP";
+            if (Math.abs(eixoX) > deadzone || Math.abs(eixoY) > deadzone) {
+                if (Math.abs(eixoX) > Math.abs(eixoY)) {
+                    if (eixoX > 0 && ultimaDirecao !== "LEFT") { velX = 4; velY = 0; ultimaDirecao = "RIGHT"; }
+                    else if (eixoX < 0 && ultimaDirecao !== "RIGHT") { velX = -4; velY = 0; ultimaDirecao = "LEFT"; }
+                } else {
+                    if (eixoY > 0 && ultimaDirecao !== "UP") { velX = 0; velY = 4; ultimaDirecao = "DOWN"; }
+                    else if (eixoY < 0 && ultimaDirecao !== "DOWN") { velX = 0; velY = -4; ultimaDirecao = "UP"; }
+                }
             }
 
-            // Suporte também ao D-Pad (Botões 12 a 15 no padrão Xbox)
-            if (gp.buttons[12] && gp.buttons[12].pressed && direcao !== "DOWN") proximaDirecao = "UP";
-            if (gp.buttons[13] && gp.buttons[13].pressed && direcao !== "UP") proximaDirecao = "DOWN";
-            if (gp.buttons[14] && gp.buttons[14].pressed && direcao !== "RIGHT") proximaDirecao = "LEFT";
-            if (gp.buttons[15] && gp.buttons[15].pressed && direcao !== "LEFT") proximaDirecao = "RIGHT";
+            // D-Pad do controle Xbox
+            if (gp.buttons[12] && gp.buttons[12].pressed && ultimaDirecao !== "DOWN") { velX = 0; velY = -4; ultimaDirecao = "UP"; }
+            if (gp.buttons[13] && gp.buttons[13].pressed && ultimaDirecao !== "UP") { velX = 0; velY = 4; ultimaDirecao = "DOWN"; }
+            if (gp.buttons[14] && gp.buttons[14].pressed && ultimaDirecao !== "RIGHT") { velX = -4; velY = 0; ultimaDirecao = "LEFT"; }
+            if (gp.buttons[15] && gp.buttons[15].pressed && ultimaDirecao !== "LEFT") { velX = 4; velY = 0; ultimaDirecao = "RIGHT"; }
         }
 
         socket.on("atualizar_arena", (dados) => {
@@ -151,14 +161,11 @@
 
         function atualizar() {
             lerControleXbox();
-            direcao = proximaDirecao;
 
-            if (direcao === "UP") posY -= 3.5;
-            if (direcao === "DOWN") posY += 3.5;
-            if (direcao === "LEFT") posX -= 3.5;
-            if (direcao === "RIGHT") posX += 3.5;
+            posX += velX;
+            posY += velY;
 
-            // Limites da Borda do Mapa
+            // Limites das Bordas do Mapa
             if (posX < 20) posX = 20;
             if (posX > MAP_WIDTH - 20) posX = MAP_WIDTH - 20;
             if (posY < 20) posY = 20;
@@ -171,14 +178,13 @@
 
             tamanhoEl.innerText = corpo.length;
 
-            // Sistema de Comida Inteligente (Gera sempre próximo ao jogador)
+            // Sistema de Comida Garantida Próxima
             let distanciaComida = Math.hypot(posX - comida.x, posY - comida.y);
-            if (distanciaComida < 25) {
+            if (distanciaComida < 30) {
                 comprimentoDesejado += 4;
                 moedasCount += 1;
                 moedasEl.innerText = moedasCount;
 
-                // Nova comida nasce a uma distância segura ao redor do jogador
                 let angulo = Math.random() * Math.PI * 2;
                 let distancia = Math.random() * 250 + 80;
                 comida.x = Math.max(50, Math.min(MAP_WIDTH - 50, posX + Math.cos(angulo) * distancia));
@@ -213,7 +219,7 @@
             ctx.lineWidth = 4;
             ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-            // Desenhar Comida (Bolinha com brilho neon)
+            // Comida
             ctx.shadowBlur = 18;
             ctx.shadowColor = comida.cor;
             ctx.fillStyle = comida.cor;
@@ -221,7 +227,7 @@
             ctx.arc(comida.x, comida.y, 8, 0, Math.PI * 2);
             ctx.fill();
 
-            // Desenhar Outros Jogadores
+            // Outros Jogadores
             for (let id in outrosJogadores) {
                 let p = outrosJogadores[id];
                 let corOutro = p.cor || "#f43f5e";
