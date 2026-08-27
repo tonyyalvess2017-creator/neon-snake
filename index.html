@@ -3,45 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slither Clone - Arena PvP</title>
+    <title>Neon Slither Online - Render Connected</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Socket.io do Render -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { background: #05050a; color: white; font-family: sans-serif; overflow: hidden; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        canvas { background: #090913; box-shadow: 0 0 50px rgba(0,0,0,0.8); border: 2px solid #1e1e3f; }
+        body { background: #030308; color: white; font-family: 'Outfit', sans-serif; overflow: hidden; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { background: #070711; box-shadow: 0 0 60px rgba(0,0,0,0.9); border: 2px solid #1a1a3a; cursor: crosshair; }
     </style>
 </head>
-<body>
+<body class="flex flex-col items-center justify-center">
 
-    <div class="absolute top-4 left-4 bg-slate-900/80 border border-slate-700 px-4 py-2 rounded-xl text-sm">
-        👑 Tamanho/Placar: <span id="placar" class="text-cyan-400 font-bold">10</span>
+    <!-- Placar e Status do Servidor -->
+    <div class="absolute top-5 left-5 bg-slate-900/90 border border-slate-700/80 px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-4 backdrop-blur-md">
+        <div class="flex items-center gap-2">
+            <div id="status-conexao" class="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></div>
+            <span class="text-xs font-bold tracking-wider text-slate-300">SERVIDOR:</span>
+            <span id="txt-status" class="text-xs text-amber-400 font-semibold">Conectando...</span>
+        </div>
+        <div class="h-4 w-[1px] bg-slate-700"></div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs font-bold tracking-wider text-slate-300">COMPRIMENTO:</span>
+            <span id="placar" class="text-cyan-400 font-extrabold text-base">30</span>
+        </div>
     </div>
 
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <canvas id="gameCanvas" width="900" height="650"></canvas>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const placarEl = document.getElementById("placar");
+        const statusEl = document.getElementById("status-conexao");
+        const txtStatusEl = document.getElementById("txt-status");
 
-        const MAP_SIZE = 3000;
-        
-        // Posição e física da cobra do jogador
+        // Conexão com o seu servidor no Render
+        const socket = io("https://neon-snake-xzlj.onrender.com", {
+            transports: ['websocket', 'polling']
+        });
+
+        socket.on("connect", () => {
+            statusEl.classList.remove("bg-amber-400");
+            statusEl.classList.add("bg-emerald-400");
+            txtStatusEl.innerText = "Online";
+            txtStatusEl.classList.remove("text-amber-400");
+            txtStatusEl.classList.add("text-emerald-400");
+        });
+
+        socket.on("disconnect", () => {
+            statusEl.classList.remove("bg-emerald-400");
+            statusEl.classList.add("bg-red-500");
+            txtStatusEl.innerText = "Desconectado";
+            txtStatusEl.classList.remove("text-emerald-400");
+            txtStatusEl.classList.add("text-red-400");
+        });
+
+        const MAP_SIZE = 4000;
+
+        // Minha Cobra (Física Slither)
         let snake = {
-            x: 1500,
-            y: 1500,
+            x: MAP_SIZE / 2 + (Math.random() * 200 - 100),
+            y: MAP_SIZE / 2 + (Math.random() * 200 - 100),
             angulo: 0,
-            velocidade: 3,
+            velocidade: 3.5,
             raio: 12,
-            cor: "#00ffcc",
-            corpo: [] // Histórico de posições para formar o rabo
+            cor: "#06b6d4",
+            corpo: []
         };
 
-        // Inicializar o corpo com 20 seguimentos iniciais
-        for (let i = 0; i < 25; i++) {
-            snake.corpo.push({ x: 1500, y: 1500 + (i * 5) });
+        const TAMANHO_ELOS = 12;
+        for (let i = 0; i < 30; i++) {
+            snake.corpo.push({ x: snake.x, y: snake.y + (i * 4) });
         }
 
-        // Mouse para guiar a direção
         let mouseX = window.innerWidth / 2;
         let mouseY = window.innerHeight / 2;
 
@@ -50,108 +84,175 @@
             mouseY = e.clientY;
         });
 
-        // Geração de Orbes de Massa espalhadas pelo mapa
+        // Orbes locais do mapa
         let orbes = [];
-        for (let i = 0; i < 500; i++) {
+        const TOTAL_ORBES = 600;
+        const coresOrbes = ["#f43f5e", "#eab308", "#06b6d4", "#a855f7", "#22c55e", "#ec4899", "#38bdf8"];
+
+        for (let i = 0; i < TOTAL_ORBES; i++) {
             orbes.push({
                 x: Math.random() * MAP_SIZE,
                 y: Math.random() * MAP_SIZE,
-                raio: Math.random() * 3 + 2,
-                cor: ["#ff0055", "#00ffcc", "#ffcc00", "#9900ff"][Math.floor(Math.random() * 4)]
+                raio: Math.random() * 3 + 3,
+                cor: coresOrbes[Math.floor(Math.random() * coresOrbes.length)]
             });
         }
 
+        let outrosJogadores = {};
+
+        // Recebe sincronização dos outros jogadores conectados no Render
+        socket.on("atualizar_arena", (dados) => {
+            outrosJogadores = dados;
+        });
+
         function atualizar() {
-            // Calcular ângulo em direção ao mouse (relativo ao centro da tela)
+            // Direção suave pelo mouse
             const centroX = canvas.width / 2;
             const centroY = canvas.height / 2;
             let anguloAlvo = Math.atan2(mouseY - centroY, mouseX - centroX);
-            
-            // Suavizar a rotação da cobra
-            snake.angulo = anguloAlvo;
 
-            // Movimentar a cabeça
+            let diff = anguloAlvo - snake.angulo;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            snake.angulo += diff * 0.15;
+
             snake.x += Math.cos(snake.angulo) * snake.velocidade;
             snake.y += Math.sin(snake.angulo) * snake.velocidade;
 
-            // Limites do mapa (paredes letais ou bordas)
-            if (snake.x < 0) snake.x = 0;
-            if (snake.x > MAP_SIZE) snake.x = MAP_SIZE;
-            if (snake.y < 0) snake.y = 0;
-            if (snake.y > MAP_SIZE) snake.y = MAP_SIZE;
+            if (snake.x < 20) snake.x = 20;
+            if (snake.x > MAP_SIZE - 20) snake.x = MAP_SIZE - 20;
+            if (snake.y < 20) snake.y = 20;
+            if (snake.y > MAP_SIZE - 20) snake.y = MAP_SIZE - 20;
 
-            // Atualizar o corpo (Efeito elástico do Slither)
-            snake.corpo.unshift({ x: snake.x, y: snake.y });
-            
-            // O tamanho do array do corpo define o comprimento da cobra
-            // Se comer uma orbe, não damos pop (a cobra cresce)
-            let comeu = false;
+            // Corpo Elástico
+            let alvoX = snake.x;
+            let alvoY = snake.y;
+
+            for (let i = 0; i < snake.corpo.length; i++) {
+                let parte = snake.corpo[i];
+                let dx = alvoX - parte.x;
+                let dy = alvoY - parte.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist > TAMANHO_ELOS) {
+                    let anguloCorpo = Math.atan2(dy, dx);
+                    parte.x = alvoX - Math.cos(anguloCorpo) * TAMANHO_ELOS;
+                    parte.y = alvoY - Math.sin(anguloCorpo) * TAMANHO_ELOS;
+                }
+                alvoX = parte.x;
+                alvoY = parte.y;
+            }
+
+            // Colisão com orbes
+            let comeuOrbe = false;
             for (let i = orbes.length - 1; i >= 0; i--) {
                 let o = orbes[i];
-                let dist = Math.hypot(snake.x - o.x, snake.y - o.y);
-                if (dist < snake.raio + o.raio) {
-                    comeu = true;
-                    // Reposiciona a orbe comida
-                    orbes[i].x = Math.random() * MAP_SIZE;
-                    orbes[i].y = Math.random() * MAP_SIZE;
+                if (Math.hypot(snake.x - o.x, snake.y - o.y) < snake.raio + o.raio) {
+                    comeuOrbe = true;
+                    o.x = Math.random() * MAP_SIZE;
+                    o.y = Math.random() * MAP_SIZE;
+                    o.cor = coresOrbes[Math.floor(Math.random() * coresOrbes.length)];
                     break;
                 }
             }
 
-            if (!comeu) {
-                snake.corpo.pop();
-            } else {
-                // Cresce e aumenta placar
+            if (comeuOrbe) {
+                let ultimoElo = snake.corpo[snake.corpo.length - 1];
+                snake.corpo.push({ x: ultimoElo.x, y: ultimoElo.y });
                 placarEl.innerText = snake.corpo.length;
             }
+
+            // Envia minha posição atualizada para o servidor no Render
+            socket.emit("player_sync", {
+                x: snake.x,
+                y: snake.y,
+                corpo: snake.corpo,
+                cor: snake.cor
+            });
         }
 
         function desenhar() {
-            // Limpar tela
-            ctx.fillStyle = "#05050a";
+            ctx.fillStyle = "#070711";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
-            // Câmera seguindo a cobra (Centralizada)
             let camX = canvas.width / 2 - snake.x;
             let camY = canvas.height / 2 - snake.y;
             ctx.translate(camX, camY);
 
-            // Desenhar grade do mapa
+            // Grade do Mapa
             ctx.strokeStyle = "#111122";
-            ctx.lineWidth = 1;
-            for (let x = 0; x <= MAP_SIZE; x += 100) {
+            ctx.lineWidth = 1.5;
+            for (let x = 0; x <= MAP_SIZE; x += 120) {
                 ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_SIZE); ctx.stroke();
             }
-            for (let y = 0; y <= MAP_SIZE; y += 100) {
+            for (let y = 0; y <= MAP_SIZE; y += 120) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_SIZE, y); ctx.stroke();
             }
 
-            // Desenhar Orbes
+            ctx.strokeStyle = "#f43f5e";
+            ctx.lineWidth = 6;
+            ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+            // Orbes
             for (let o of orbes) {
-                ctx.fillStyle = o.cor;
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 10;
                 ctx.shadowColor = o.cor;
+                ctx.fillStyle = o.cor;
                 ctx.beginPath();
                 ctx.arc(o.x, o.y, o.raio, 0, Math.PI * 2);
                 ctx.fill();
             }
-            ctx.shadowBlur = 0; // Resetar brilho
+            ctx.shadowBlur = 0;
 
-            // Desenhar Corpo da Cobra
+            // Outros Jogadores vindos do Render
+            for (let id in outrosJogadores) {
+                if (id === socket.id) continue;
+                let p = outrosJogadores[id];
+                let corOutro = p.cor || "#f43f5e";
+
+                if (p.corpo) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = corOutro;
+                    ctx.fillStyle = corOutro;
+                    for (let parte of p.corpo) {
+                        ctx.beginPath();
+                        ctx.arc(parte.x, parte.y, 11, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Meu Corpo
             for (let i = snake.corpo.length - 1; i >= 0; i--) {
                 let parte = snake.corpo[i];
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = snake.cor;
                 ctx.fillStyle = snake.cor;
                 ctx.beginPath();
                 ctx.arc(parte.x, parte.y, snake.raio, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            // Desenhar Cabeça com olhos
-            ctx.fillStyle = "#fff";
+            // Minha Cabeça
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = snake.cor;
+            ctx.fillStyle = snake.cor;
             ctx.beginPath();
-            ctx.arc(snake.x, snake.y, snake.raio, 0, Math.PI * 2);
+            ctx.arc(snake.x, snake.y, snake.raio + 1, 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Olhos
+            ctx.fillStyle = "#ffffff";
+            let olhoDist = 6;
+            let olho1X = snake.x + Math.cos(snake.angulo - 0.6) * olhoDist;
+            let olho1Y = snake.y + Math.sin(snake.angulo - 0.6) * olhoDist;
+            let olho2X = snake.x + Math.cos(snake.angulo + 0.6) * olhoDist;
+            let olho2Y = snake.y + Math.sin(snake.angulo + 0.6) * olhoDist;
+
+            ctx.beginPath(); ctx.arc(olho1X, olho1Y, 3.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(olho2X, olho2Y, 3.5, 0, Math.PI * 2); ctx.fill();
 
             ctx.restore();
         }
