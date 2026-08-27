@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Snake Arena - Mundo Infinito & PvP</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Socket.io -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap');
+        body { font-family: 'Outfit', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-2">
+
+    <div class="max-w-5xl w-full bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col items-center">
+        
+        <!-- Header -->
+        <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
+            <div>
+                <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (MUNDO LIVRE)</h1>
+                <p class="text-xs text-slate-400">A câmera agora segue a sua cobra pelo mapa gigante!</p>
+            </div>
+            <div class="flex gap-4">
+                <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
+                    🪙 MOEDAS: <span id="moedas" class="text-white text-sm">0</span>
+                </div>
+                <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-cyan-400 flex items-center gap-1">
+                    TAMANHO: <span id="tamanho" class="text-white text-sm">15</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área Central -->
+        <div class="flex flex-col md:flex-row gap-4 w-full items-center justify-center">
+            
+            <!-- Canvas -->
+            <div class="relative rounded-xl overflow-hidden border-2 border-cyan-500/50 shadow-[0_0_35px_rgba(6,182,212,0.25)] bg-slate-950">
+                <canvas id="gameCanvas" width="680" height="400" class="block"></canvas>
+            </div>
+
+            <!-- Loja de Skins -->
+            <div class="w-full md:w-64 bg-slate-950/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+                <h2 class="text-sm font-bold text-fuchsia-400 uppercase tracking-wider border-b border-slate-800 pb-1">Loja de Skins</h2>
+                <div class="flex flex-col gap-2 max-h-[340px] overflow-y-auto pr-1">
+                    <button onclick="mudarSkin('#06b6d4', 0)" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-cyan-500/40 text-xs font-bold text-cyan-400 flex justify-between items-center transition">
+                        <span>Neon Cyan</span><span class="text-[10px] bg-cyan-950 px-2 py-0.5 rounded text-cyan-300">Grátis</span>
+                    </button>
+                    <button onclick="mudarSkin('#eab308', 5)" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-xs font-bold text-amber-400 flex justify-between items-center transition">
+                        <span>Gold Cyber</span><span class="text-[10px] bg-amber-950 px-2 py-0.5 rounded text-amber-300">5 Moedas</span>
+                    </button>
+                    <button onclick="mudarSkin('#ec4899', 10)" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-pink-500/40 text-xs font-bold text-pink-400 flex justify-between items-center transition">
+                        <span>Laser Pink</span><span class="text-[10px] bg-pink-950 px-2 py-0.5 rounded text-pink-300">10 Moedas</span>
+                    </button>
+                    <button onclick="mudarSkin('#22c55e', 15)" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-green-500/40 text-xs font-bold text-green-400 flex justify-between items-center transition">
+                        <span>Matrix Green</span><span class="text-[10px] bg-green-950 px-2 py-0.5 rounded text-green-300">15 Moedas</span>
+                    </button>
+                    <button onclick="mudarSkin('#8b5cf6', 20)" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-purple-500/40 text-xs font-bold text-purple-400 flex justify-between items-center transition">
+                        <span>Void Purple</span><span class="text-[10px] bg-purple-950 px-2 py-0.5 rounded text-purple-300">20 Moedas</span>
+                    </button>
+                    <button onclick="mudarSkin('#ef4444', 30)" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-red-500/40 text-xs font-bold text-red-400 flex justify-between items-center transition">
+                        <span>Blood Ruby</span><span class="text-[10px] bg-red-950 px-2 py-0.5 rounded text-red-300">30 Moedas</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="flex justify-between w-full mt-3 text-xs text-slate-400 px-1">
+            <span>🕹️ Controles: Teclado (WASD) ou Controle Xbox (Analógico)</span>
+            <span class="text-emerald-400 font-semibold">⚡ Servidor Online Ativo</span>
+        </div>
+    </div>
+
+    <!-- Lógica do Jogo com Câmera Dinâmica -->
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const moedasEl = document.getElementById("moedas");
+        const tamanhoEl = document.getElementById("tamanho");
+
+        // ⚠️ SUBSTITUA COM A URL DO SEU RENDER/GLITCH:
+        const socket = io("https://SEU-LINK-AQUI.onrender.com", {
+            transports: ['websocket', 'polling']
+        });
+        
+        // Tamanho total do mapa do jogo (bem grande)
+        const MAP_WIDTH = 2500;
+        const MAP_HEIGHT = 2500;
+
+        let posX = Math.random() * 1000 + 500;
+        let posY = Math.random() * 1000 + 500;
+        let direcao = "RIGHT";
+        let corpo = [];
+        let comprimentoDesejado = 15;
+        let moedasCount = 0;
+        let minhaCor = "#06b6d4";
+
+        let comida = { x: Math.random() * MAP_WIDTH, y: Math.random() * MAP_HEIGHT, cor: "#f43f5e" };
+        let outrosJogadores = {};
+
+        function mudarSkin(corHex, custo) {
+            if (moedasCount >= custo) {
+                moedasCount -= custo;
+                minhaCor = corHex;
+                moedasEl.innerText = moedasCount;
+            } else {
+                alert("Moedas insuficientes!");
+            }
+        }
+
+        // Teclado
+        window.addEventListener("keydown", (e) => {
+            if ((e.key === "ArrowUp" || e.key === "w") && direcao !== "DOWN") direcao = "UP";
+            if ((e.key === "ArrowDown" || e.key === "s") && direcao !== "UP") direcao = "DOWN";
+            if ((e.key === "ArrowLeft" || e.key === "a") && direcao !== "RIGHT") direcao = "LEFT";
+            if ((e.key === "ArrowRight" || e.key === "d") && direcao !== "LEFT") direcao = "RIGHT";
+        });
+
+        // Controle Xbox
+        function lerControleXbox() {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            if (!gamepads[0]) return;
+            const gp = gamepads[0];
+            const eixoX = gp.axes[0];
+            const eixoY = gp.axes[1];
+
+            if (Math.abs(eixoX) > Math.abs(eixoY)) {
+                if (eixoX > 0.5 && direcao !== "LEFT") direcao = "RIGHT";
+                else if (eixoX < -0.5 && direcao !== "RIGHT") direcao = "LEFT";
+            } else {
+                if (eixoY > 0.5 && direcao !== "UP") direcao = "DOWN";
+                else if (eixoY < -0.5 && direcao !== "DOWN") direcao = "UP";
+            }
+        }
+
+        socket.on("atualizar_arena", (dados) => {
+            outrosJogadores = dados;
+        });
+
+        function atualizar() {
+            lerControleXbox();
+
+            if (direcao === "UP") posY -= 3;
+            if (direcao === "DOWN") posY += 3;
+            if (direcao === "LEFT") posX -= 3;
+            if (direcao === "RIGHT") posX += 3;
+
+            // Limites do mapa gigante (borda sólida)
+            if (posX < 20) posX = 20;
+            if (posX > MAP_WIDTH - 20) posX = MAP_WIDTH - 20;
+            if (posY < 20) posY = 20;
+            if (posY > MAP_HEIGHT - 20) posY = MAP_HEIGHT - 20;
+
+            corpo.unshift({ x: posX, y: posY });
+            if (corpo.length > comprimentoDesejado) {
+                corpo.pop();
+            }
+
+            tamanhoEl.innerText = corpo.length;
+
+            // Comer Comida
+            let distanciaComida = Math.hypot(posX - comida.x, posY - comida.y);
+            if (distanciaComida < 20) {
+                comprimentoDesejado += 4;
+                moedasCount += 1;
+                moedasEl.innerText = moedasCount;
+                comida.x = Math.random() * (MAP_WIDTH - 100) + 50;
+                comida.y = Math.random() * (MAP_HEIGHT - 100) + 50;
+            }
+
+            // Envia os dados sincronizando com o servidor (o servidor vai injetar o socket.id correto)
+            socket.emit("player_sync", { x: posX, y: posY, corpo: corpo, cor: minhaCor });
+        }
+
+        function desenhar() {
+            let camX = posX - canvas.width / 2;
+            let camY = posY - canvas.height / 2;
+
+            ctx.fillStyle = "#020617";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camX, -camY);
+
+            // Desenhar Grade do Mundo Gigante
+            ctx.strokeStyle = "#0f172a";
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= MAP_WIDTH; i += 80) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, MAP_HEIGHT); ctx.stroke();
+            }
+            for (let j = 0; j <= MAP_HEIGHT; j += 80) {
+                ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(MAP_WIDTH, j); ctx.stroke();
+            }
+
+            // Bordas do Mapa
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = 4;
+            ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+            // Desenhar Comida
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = comida.cor;
+            ctx.fillStyle = comida.cor;
+            ctx.beginPath();
+            ctx.arc(comida.x, comida.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Desenhar Outros Jogadores Online (Excluindo a si mesmo pelo socket.id se necessário, ou exibindo todos vindos do server)
+            for (let id in outrosJogadores) {
+                let p = outrosJogadores[id];
+                let corOutro = p.cor || "#f43f5e";
+                ctx.shadowColor = corOutro;
+                ctx.fillStyle = corOutro;
+                if (p.corpo) {
+                    for (let parte of p.corpo) {
+                        ctx.fillRect(parte.x - 6, parte.y - 6, 12, 12);
+                    }
+                }
+            }
+
+            ctx.restore(); 
+        }
+
+        function loop() {
+            atualizar();
+            desenhar();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
