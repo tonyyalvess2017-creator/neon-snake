@@ -3,54 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slither Game - Custom</title>
+    <title>Slither.io Multiplayer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: sans-serif; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         canvas { display: block; }
-        
-        /* Tela de Menu / Login */
+
+        /* Estilo do Menu Principal e da Loja */
         #menu {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(20, 20, 20, 0.95);
+            background: rgba(15, 15, 15, 0.95);
             padding: 30px;
-            border-radius: 12px;
+            border-radius: 16px;
             text-align: center;
             color: #fff;
             border: 2px solid #00f0ff;
             z-index: 10;
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+            width: 380px;
         }
-        #menu h2 { margin-bottom: 15px; color: #00f0ff; letter-spacing: 1px; }
+        #menu h1 { color: #00f0ff; margin-bottom: 20px; font-size: 26px; letter-spacing: 2px; }
         #menu input {
             padding: 12px;
             font-size: 16px;
-            border-radius: 6px;
-            border: 1px solid #444;
+            border-radius: 8px;
+            border: 1px solid #333;
             background: #222;
             color: #fff;
             margin-bottom: 15px;
-            width: 220px;
+            width: 100%;
             text-align: center;
             outline: none;
         }
-        #menu input:focus { border-color: #00f0ff; }
-        #menu button {
-            padding: 12px 25px;
+        #menu input:focus { border-color: #00f0ff; box-shadow: 0 0 8px rgba(0,240,255,0.5); }
+        
+        .btn {
+            padding: 12px 20px;
             font-size: 16px;
             background: #00f0ff;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             color: #000;
+            width: 100%;
+            margin-bottom: 10px;
             transition: 0.2s;
         }
-        #menu button:hover { background: #00bcd4; transform: scale(1.05); }
+        .btn:hover { background: #00bcd4; transform: translateY(-2px); }
+        .btn-secondary { background: #333; color: #fff; }
+        .btn-secondary:hover { background: #444; }
 
-        /* Placar e HUD */
+        /* Painel da Loja */
+        #shopPanel {
+            display: none;
+            margin-top: 15px;
+            border-top: 1px solid #333;
+            padding-top: 15px;
+        }
+        .skin-option {
+            display: inline-block;
+            width: 35px; height: 35px;
+            border-radius: 50%;
+            margin: 5px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: 0.2s;
+        }
+        .skin-option:hover { transform: scale(1.1); }
+        .skin-option.selected { border-color: #fff; box-shadow: 0 0 10px #fff; }
+
+        /* HUD de Jogo */
         #hud {
             position: absolute;
             top: 20px; left: 20px;
@@ -62,26 +87,46 @@
             display: none;
             text-shadow: 2px 2px 4px #000;
         }
+        #coinsDisplay {
+            position: absolute;
+            top: 20px; right: 20px;
+            color: #ffe600;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 5;
+            text-shadow: 2px 2px 4px #000;
+        }
     </style>
 </head>
 <body>
 
+    <div id="coinsDisplay">Moedas: <span id="playerCoins">0</span></div>
     <div id="hud">Comprimento: <span id="score">35</span></div>
 
-    <!-- Menu Inicial -->
+    <!-- Menu / Loja -->
     <div id="menu">
-        <h2>JOGO DA COBRINHA</h2>
-        <input type="text" id="playerName" placeholder="Digite seu Nick" maxlength="15"><br>
-        <button id="playBtn">JOGAR</button>
+        <h1>SLITHER.IO</h1>
+        <input type="text" id="playerName" placeholder="Digite seu Nick" maxlength="15">
+        <button class="btn" id="playBtn">JOGAR</button>
+        <button class="btn btn-secondary" id="openShopBtn">LOJA DE SKINS</button>
+
+        <div id="shopPanel">
+            <p style="margin-bottom: 10px; font-size: 14px; color: #aaa;">Escolha sua Cor:</p>
+            <div class="skin-option" style="background: #00f0ff;" onclick="changeSkin('#00f0ff')"></div>
+            <div class="skin-option" style="background: #ff0055;" onclick="changeSkin('#ff0055')"></div>
+            <div class="skin-option" style="background: #ffe600;" onclick="changeSkin('#ffe600')"></div>
+            <div class="skin-option" style="background: #00ff66;" onclick="changeSkin('#00ff66')"></div>
+            <div class="skin-option" style="background: #a855f7;" onclick="changeSkin('#a855f7')"></div>
+            <br>
+            <button class="btn btn-secondary" id="closeShopBtn" style="margin-top: 10px;">Voltar</button>
+        </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Importação do Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -93,10 +138,12 @@
         resizeCanvas();
 
         const MAP_SIZE = 6000;
-
         let gameStarted = false;
         let mouseX = window.innerWidth / 2;
         let mouseY = window.innerHeight / 2;
+
+        let coins = localStorage.getItem('snake_coins') ? parseInt(localStorage.getItem('snake_coins')) : 0;
+        document.getElementById('playerCoins').innerText = coins;
 
         let player = {
             name: '',
@@ -112,6 +159,25 @@
         let serverBots = {};
         let serverFoods = [];
 
+        // Controle da Loja Visual
+        document.getElementById('openShopBtn').addEventListener('click', () => {
+            document.getElementById('openShopBtn').style.display = 'none';
+            document.getElementById('playBtn').style.display = 'none';
+            document.getElementById('playerName').style.display = 'none';
+            document.getElementById('shopPanel').style.display = 'block';
+        });
+
+        document.getElementById('closeShopBtn').addEventListener('click', () => {
+            document.getElementById('shopPanel').style.display = 'none';
+            document.getElementById('openShopBtn').style.display = 'block';
+            document.getElementById('playBtn').style.display = 'block';
+            document.getElementById('playerName').style.display = 'block';
+        });
+
+        function changeSkin(colorHex) {
+            player.color = colorHex;
+        }
+
         window.addEventListener('mousemove', (e) => {
             mouseX = e.clientX;
             mouseY = e.clientY;
@@ -119,11 +185,11 @@
 
         document.getElementById('playBtn').addEventListener('click', () => {
             let nameInput = document.getElementById('playerName').value.trim();
-            if (!nameInput) nameInput = "Jogador_" + Math.floor(Math.random() * 1000);
+            if (!nameInput) nameInput = "Cobrinha_" + Math.floor(Math.random() * 1000);
             
             player.name = nameInput;
-            player.x = Math.random() * 2000 + 2000;
-            player.y = Math.random() * 2000 + 2000;
+            player.x = Math.random() * 3000 + 1500;
+            player.y = Math.random() * 3000 + 1500;
 
             player.body = [];
             for (let i = 0; i < 35; i++) {
@@ -131,6 +197,7 @@
             }
 
             document.getElementById('menu').style.display = 'none';
+            document.getElementById('coinsDisplay').style.display = 'none';
             document.getElementById('hud').style.display = 'block';
             gameStarted = true;
 
@@ -150,14 +217,17 @@
         });
 
         socket.on('player_died', (data) => {
-            let moedasGanhas = Math.floor(data.score / 5);
-            alert('Você morreu! Pontuação final: ' + data.score + '\n+' + moedasGanhas + ' Moedas ganhas na partida!');
+            let ganho = Math.floor(data.score / 5);
+            coins += ganho;
+            localStorage.setItem('snake_coins', coins);
+            alert('Você morreu!\nPontuação: ' + data.score + '\nMoedas ganhas: +' + ganho);
             location.reload();
         });
 
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // SÓ RENDERIZA O JOGO SE TIVER CLICADO EM JOGAR (Isso evita a bordinha no menu!)
             if (gameStarted) {
                 let centerX = canvas.width / 2;
                 let centerY = canvas.height / 2;
@@ -168,10 +238,11 @@
                 player.x += Math.cos(player.angle) * player.speed;
                 player.y += Math.sin(player.angle) * player.speed;
 
-                // Trava limite na cliente
+                // Trava rigorosa para não passar da borda
                 player.x = Math.max(50, Math.min(MAP_SIZE - 50, player.x));
                 player.y = Math.max(50, Math.min(MAP_SIZE - 50, player.y));
 
+                // Física do corpo seguindo o líder
                 let targetX = player.x;
                 let targetY = player.y;
                 for (let i = 0; i < player.body.length; i++) {
@@ -199,19 +270,19 @@
 
                 document.getElementById('score').innerText = player.body.length;
 
-                // Renderização da câmera e do mundo de jogo
+                // Câmera centrada no jogador
                 let camX = player.x - canvas.width / 2;
                 let camY = player.y - canvas.height / 2;
 
                 ctx.save();
                 ctx.translate(-camX, -camY);
 
-                // Borda do mapa
+                // Desenha Borda do Mapa
                 ctx.strokeStyle = '#ff0055';
                 ctx.lineWidth = 10;
                 ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-                // Comida
+                // Desenha Comida
                 if (serverFoods) {
                     serverFoods.forEach(f => {
                         ctx.fillStyle = f.color;
@@ -241,10 +312,10 @@
                     }
                 }
 
+                // Desenha Bots e Jogadores
                 for (let id in serverBots) {
                     drawSnake(serverBots[id]);
                 }
-
                 for (let id in serverPlayers) {
                     if (id !== socket.id) {
                         drawSnake(serverPlayers[id]);
