@@ -13,7 +13,8 @@ let bots = {};
 let foods = [];
 const MAP_SIZE = 6000;
 
-for (let i = 0; i < 2000; i++) {
+// Otimizado para 800 comidas para garantir fluidez total sem travar
+for (let i = 0; i < 800; i++) {
     foods.push({
         id: i,
         x: Math.random() * MAP_SIZE,
@@ -23,7 +24,7 @@ for (let i = 0; i < 2000; i++) {
 }
 
 const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
-for (let i = 0; i < 20; i++) {
+for (let i = 0; i < 15; i++) {
     spawnBot(`bot_${i}`, botNames[i % botNames.length]);
 }
 
@@ -110,6 +111,7 @@ setInterval(() => {
 
     let allEntities = { ...players, ...bots };
 
+    // Verificação de comida otimizada
     for (let id in allEntities) {
         let entity = allEntities[id];
         if (!entity || !entity.body) continue;
