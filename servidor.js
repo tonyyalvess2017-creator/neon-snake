@@ -63,22 +63,29 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-    // Processamento centralizado de comida: garante que apenas quem colide de fato com a bolinha cresce e atualiza o tamanho real
+    // Processamento estrito de comida baseado na posição real da cabeça e raio de colisão
     for (let id in players) {
         let p = players[id];
-        if (!p || !p.body) continue;
+        if (!p || !p.body || p.body.length === 0) continue;
+
+        let head = p.body[0]; // Referência precisa na cabeça da cobra
 
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
-            let dist = Math.hypot(p.x - f.x, p.y - f.y);
-            if (dist < 22) {
-                // Adiciona novas partes ao corpo da cobra com base estrita na comida ingerida
+            let dist = Math.hypot(head.x - f.x, head.y - f.y);
+            
+            // Distância ajustada para o raio da cabeça + bolinha
+            if (dist < 20) {
+                // Adiciona o incremento exato na cauda baseado na última posição registrada
                 let tail = p.body[p.body.length - 1];
-                p.body.push({ x: tail.x, y: tail.y });
+                let secondTail = p.body[p.body.length - 2] || tail;
                 
-                // Reposiciona a comida coletada no mapa
-                foods[i].x = Math.random() * MAP_SIZE;
-                foods[i].y = Math.random() * MAP_SIZE;
+                // Cria a nova parte estritamente alinhada ao vetor da cauda
+                p.body.push({ x: tail.x, y: tail.y });
+
+                // Reposiciona a comida coletada aleatoriamente no mapa
+                foods[i].x = Math.random() * (MAP_SIZE - 200) + 100;
+                foods[i].y = Math.random() * (MAP_SIZE - 200) + 100;
             }
         }
     }
@@ -87,6 +94,7 @@ setInterval(() => {
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
+        let head = p.body[0];
 
         for (let oId in players) {
             if (pId === oId) continue;
@@ -95,7 +103,7 @@ setInterval(() => {
 
             for (let i = 0; i < target.body.length; i++) {
                 let part = target.body[i];
-                let dist = Math.hypot(p.x - part.x, p.y - part.y);
+                let dist = Math.hypot(head.x - part.x, head.y - part.y);
                 if (dist < 14) {
                     let finalScore = p.body.length;
                     p.body.forEach((pt, index) => {
@@ -116,4 +124,4 @@ setInterval(() => {
 }, 1000 / 60);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor 100% online rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor de alta performance rodando na porta ${PORT}`));
