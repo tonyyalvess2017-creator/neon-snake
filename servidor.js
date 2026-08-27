@@ -12,7 +12,7 @@ let players = {};
 let foods = [];
 const MAP_SIZE = 6000;
 
-// Gera a comida inicial no mapa
+// Gera comidas iniciais no mapa
 for (let i = 0; i < 800; i++) {
     foods.push({
         id: i,
@@ -31,8 +31,7 @@ io.on('connection', (socket) => {
             y: data.y,
             angle: 0,
             body: data.body || [],
-            color: data.color || '#00f0ff',
-            score: data.body ? data.body.length : 35
+            color: data.color || '#00f0ff'
         };
     });
 
@@ -44,9 +43,18 @@ io.on('connection', (socket) => {
             players[socket.id].body = data.body;
             players[socket.id].color = data.color;
             players[socket.id].name = data.name;
-            // Atualiza a pontuação baseada no comprimento exato enviado pelo cliente
-            players[socket.id].score = data.body ? data.body.length : 35;
         }
+    });
+
+    socket.on('player_died_notify', (data) => {
+        if (players[socket.id] && players[socket.id].body) {
+            players[socket.id].body.forEach((pt, index) => {
+                if (index % 2 === 0) {
+                    foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: players[socket.id].color });
+                }
+            });
+        }
+        delete players[socket.id];
     });
 
     socket.on('disconnect', () => {
@@ -55,7 +63,7 @@ io.on('connection', (socket) => {
 });
 
 setInterval(() => {
-    // Verificação de colisão com a comida (processada centralmente)
+    // Coleta de comida pelos jogadores
     for (let id in players) {
         let p = players[id];
         if (!p || !p.body) continue;
@@ -72,23 +80,17 @@ setInterval(() => {
         }
     }
 
-    // Verificação de bordas e colisões entre jogadores reais
+    // Validação de colisão PVP (Apenas entre jogadores diferentes)
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
 
-        if (p.x <= 30 || p.x >= MAP_SIZE - 30 || p.y <= 30 || p.y >= MAP_SIZE - 30) {
-            io.to(pId).emit('player_died', { score: p.body.length });
-            delete players[pId];
-            continue;
-        }
-
         for (let oId in players) {
+            if (pId === oId) continue; // Ignora o próprio jogador
             let target = players[oId];
             if (!target || !target.body) continue;
 
-            let startIdx = (pId === oId) ? 5 : 0;
-            for (let i = startIdx; i < target.body.length; i++) {
+            for (let i = 0; i < target.body.length; i++) {
                 let part = target.body[i];
                 let dist = Math.hypot(p.x - part.x, p.y - part.y);
                 if (dist < 14) {
@@ -107,7 +109,6 @@ setInterval(() => {
         }
     }
 
-    // Envia o estado atualizado contendo apenas os dados dos jogadores reais e comidas
     io.emit('server_update', { players, foods });
 }, 1000 / 60);
 
