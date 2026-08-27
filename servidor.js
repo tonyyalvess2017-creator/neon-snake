@@ -10,33 +10,34 @@ app.use(express.static(__dirname));
 
 let players = {};
 let foods = [];
+const MAP_SIZE = 6000;
 
-// Gera comida inicial na arena gigante
-for (let i = 0; i < 1000; i++) {
+// Inicializa o mapa com 1500 orbes de comida distribuídas
+for (let i = 0; i < 1500; i++) {
     foods.push({
         id: i,
-        x: Math.random() * 5000,
-        y: Math.random() * 5000,
-        color: ['#ff0055', '#ffe600', '#00f0ff', '#a855f7', '#00ff66'][Math.floor(Math.random() * 5)]
+        x: Math.random() * MAP_SIZE,
+        y: Math.random() * MAP_SIZE,
+        color: ['#ff0055', '#ffe600', '#00f0ff', '#a855f7', '#00ff66', '#ff5500'][Math.floor(Math.random() * 6)]
     });
 }
 
 io.on('connection', (socket) => {
-    console.log(`[+] Jogador conectado: ${socket.id}`);
+    console.log(`[+] Conexão estabelecida: ${socket.id}`);
 
-    socket.on('join_game', (data) => {
+    socket.on('player_join', (data) => {
         players[socket.id] = {
             id: socket.id,
             x: data.x,
             y: data.y,
             angle: 0,
             score: 30,
-            body: data.body,
-            color: data.color
+            body: data.body || [],
+            color: data.color || '#00f0ff'
         };
     });
 
-    socket.on('player_update', (data) => {
+    socket.on('player_sync', (data) => {
         if (players[socket.id]) {
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
@@ -47,15 +48,17 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`[-] Jogador desconectado: ${socket.id}`);
+        console.log(`[-] Conexão encerrada: ${socket.id}`);
         delete players[socket.id];
     });
 });
 
-// Loop de sincronização global da arena
+// Loop de alta performance do servidor (60 FPS tick-rate)
 setInterval(() => {
-    io.emit('server_tick', { players, foods });
+    io.emit('server_update', { players, foods });
 }, 1000 / 60);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Engine rodando na porta ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Servidor de produção rodando na porta ${PORT}`);
+});
