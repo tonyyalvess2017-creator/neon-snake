@@ -1,6 +1,3 @@
-// ==========================================
-// 1. IMPORTAÇÕES E CONFIGURAÇÃO DO SERVIDOR
-// ==========================================
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -11,16 +8,13 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(__dirname));
 
-// ==========================================
-// 2. VARIÁVEIS GLOBAIS E MAPA
-// ==========================================
-let players = {}; 
-let bots = {};    
-let foods = [];   
-const MAP_SIZE = 6000; // Tamanho total do mapa em pixels
+let players = {};
+let bots = {};
+let foods = [];
+const MAP_SIZE = 6000;
 
-// Gera a comida inicial espalhada pelo mapa
-for (let i = 0; i < 1500; i++) {
+// Gera comida inicial
+for (let i = 0; i < 2000; i++) {
     foods.push({
         id: i,
         x: Math.random() * MAP_SIZE,
@@ -29,12 +23,8 @@ for (let i = 0; i < 1500; i++) {
     });
 }
 
-// ==========================================
-// 3. SISTEMA DE BOTS COM NOMES REAIS
-// ==========================================
-const botNames = ["Bernardo", "Gabriel", "Lucas", "Igor", "Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
-
-for (let i = 0; i < 15; i++) {
+const botNames = ["Viper", "CyberSnake", "NeonWorm", "Venom", "Apex", "Titan", "Shadow", "Blaze", "Ghost", "PythonMaster"];
+for (let i = 0; i < 20; i++) {
     spawnBot(`bot_${i}`, botNames[i % botNames.length]);
 }
 
@@ -42,11 +32,9 @@ function spawnBot(id, name) {
     let bX = Math.random() * (MAP_SIZE - 1000) + 500;
     let bY = Math.random() * (MAP_SIZE - 1000) + 500;
     let bBody = [];
-    
     for (let j = 0; j < 35; j++) {
         bBody.push({ x: bX, y: bY + (j * 4) });
     }
-    
     bots[id] = {
         id: id,
         name: name,
@@ -60,10 +48,9 @@ function spawnBot(id, name) {
     };
 }
 
-// ==========================================
-// 4. CONEXÕES E SINCRONIZAÇÃO DE DADOS
-// ==========================================
 io.on('connection', (socket) => {
+    console.log(`[+] Conectado: ${socket.id}`);
+
     socket.on('player_join', (data) => {
         players[socket.id] = {
             id: socket.id,
@@ -72,21 +59,17 @@ io.on('connection', (socket) => {
             y: data.y,
             angle: 0,
             body: data.body || [],
-            color: data.color || '#00f0ff' // Recebe a cor escolhida na Loja
+            color: data.color || '#00f0ff'
         };
     });
 
-    // BLINDAGEM DE BORDA NO SERVIDOR: Impede que o jogador ultrapasse o limite
     socket.on('player_sync', (data) => {
         if (players[socket.id]) {
-            let clampedX = Math.max(60, Math.min(MAP_SIZE - 60, data.x));
-            let clampedY = Math.max(60, Math.min(MAP_SIZE - 60, data.y));
-
-            players[socket.id].x = clampedX;
-            players[socket.id].y = clampedY;
+            players[socket.id].x = data.x;
+            players[socket.id].y = data.y;
             players[socket.id].angle = data.angle;
             players[socket.id].body = data.body;
-            players[socket.id].color = data.color; // Atualiza a cor se mudou
+            players[socket.id].color = data.color;
             players[socket.id].name = data.name;
         }
     });
@@ -96,12 +79,9 @@ io.on('connection', (socket) => {
     });
 });
 
-// ==========================================
-// 5. LOOP DO SERVIDOR (60 FPS)
-// ==========================================
+// Loop principal de lógica do servidor
 setInterval(() => {
-    
-    // --- 5.1 Movimentação dos Bots ---
+    // 1. Atualiza Bots com IA fluida
     for (let id in bots) {
         let bot = bots[id];
         bot.changeTimer++;
@@ -133,20 +113,21 @@ setInterval(() => {
         }
     }
 
+    // 2. Checagem de Colisão (Morte e Comida)
     let allEntities = { ...players, ...bots };
 
-    // --- 5.2 Consumo de Comida (Crescimento da Cobra) ---
+    // Come comida (Players e Bots)
     for (let id in allEntities) {
         let entity = allEntities[id];
         if (!entity || !entity.body) continue;
 
         for (let i = foods.length - 1; i >= 0; i--) {
             let f = foods[i];
-            if (Math.abs(entity.x - f.x) < 20 && Math.abs(entity.y - f.y) < 20) {
-                // Adiciona um novo segmento na cauda
+            let dist = Math.hypot(entity.x - f.x, entity.y - f.y);
+            if (dist < 20) {
+                // Cresce adicionando partes ao corpo
                 let tail = entity.body[entity.body.length - 1];
                 entity.body.push({ x: tail.x, y: tail.y });
-                
                 // Reposiciona a comida comida
                 foods[i].x = Math.random() * MAP_SIZE;
                 foods[i].y = Math.random() * MAP_SIZE;
@@ -154,49 +135,45 @@ setInterval(() => {
         }
     }
 
-    // --- 5.3 Colisão PVP Segura (Folga de 18 partes para zerar mortes falsas) ---
+    // Colisão entre cabeças e corpos (Morte)
     for (let pId in players) {
         let p = players[pId];
         if (!p || !p.body) continue;
 
-        let morreu = false;
+        // Bateu nas bordas do mapa
+        if (p.x <= 30 || p.x >= MAP_SIZE - 30 || p.y <= 30 || p.y >= MAP_SIZE - 30) {
+            io.to(pId).emit('player_died');
+            delete players[pId];
+            continue;
+        }
+
+        // Bateu em outros corpos (inclusive o próprio)
         for (let oId in allEntities) {
             let target = allEntities[oId];
             if (!target || !target.body) continue;
 
-            // Ignora os primeiros 18 segmentos do próprio corpo para curvar sem morrer
-            let startIdx = (pId === oId) ? 18 : 0;
-            
-            for (let i = startIdx; i < target.body.length; i += 2) {
+            let startIdx = (pId === oId) ? 5 : 0; // Ignora o próprio pescoço imediato
+            for (let i = startIdx; i < target.body.length; i++) {
                 let part = target.body[i];
-                if (Math.abs(p.x - part.x) < 10 && Math.abs(p.y - part.y) < 10) {
-                    morreu = true;
+                let dist = Math.hypot(p.x - part.x, p.y - part.y);
+                if (dist < 14) {
+                    // Morreu! Transforma o corpo em comida
+                    p.body.forEach((pt, index) => {
+                        if (index % 2 === 0) {
+                            foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
+                        }
+                    });
+                    io.to(pId).emit('player_died');
+                    delete players[pId];
                     break;
                 }
             }
-            if (morreu) break;
-        }
-
-        if (morreu) {
-            let finalScore = p.body.length;
-            // Transforma o corpo da cobra morta em comida no mapa
-            p.body.forEach((pt, index) => {
-                if (index % 2 === 0) {
-                    foods.push({ id: Math.random(), x: pt.x, y: pt.y, color: p.color });
-                }
-            });
-            io.to(pId).emit('player_died', { score: finalScore });
-            delete players[pId];
+            if (!players[pId]) break;
         }
     }
 
-    // --- 5.4 Sincronização Geral para Todos ---
     io.emit('server_update', { players, bots, foods });
-
 }, 1000 / 60);
 
-// ==========================================
-// 6. INICIALIZAÇÃO
-// ==========================================
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor rodando perfeitamente na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
