@@ -21,7 +21,7 @@
         <div class="flex justify-between w-full items-center mb-3 border-b border-slate-800 pb-2">
             <div>
                 <h1 class="text-xl font-extrabold tracking-wider text-cyan-400">NEON SNAKE PVP (MUNDO LIVRE)</h1>
-                <p class="text-xs text-slate-400">Modo Clássico Fluido: Crescimento garantido e controles otimizados!</p>
+                <p class="text-xs text-slate-400">Modo Clássico Perfeito: Controles sem conflito e crescimento fluído!</p>
             </div>
             <div class="flex gap-4">
                 <div class="bg-slate-800 px-3 py-1 rounded-xl border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1">
@@ -74,7 +74,7 @@
         </div>
     </div>
 
-    <!-- Lógica do Jogo com Grid Clássico -->
+    <!-- Lógica Definitiva do Jogo -->
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -99,7 +99,8 @@
         
         let dx = GRID_SIZE;
         let dy = 0;
-        let proximaDirecaoValida = "RIGHT";
+        let proximaDirecao = { dx: GRID_SIZE, dy: 0 }; // Buffer de segurança para evitar bugs de input
+        let controleNeutro = true; // Impede repetição fantasma do analógico
 
         let moedasCount = 0;
         let minhaCor = "#06b6d4";
@@ -117,24 +118,24 @@
             }
         }
 
-        // Eventos de Teclado (Padrão Cobra Clássico)
+        // Função segura para mudar direção sem quebrar as regras da cobrinha
+        function mudarDirecao(novoDx, novoDy) {
+            // Impede a cobra de voltar direto para dentro do próprio pescoço
+            if (novoDx !== -dx || novoDy !== -dy) {
+                proximaDirecao = { dx: novoDx, dy: novoDy };
+            }
+        }
+
+        // Eventos de Teclado
         window.addEventListener("keydown", (e) => {
             const key = e.key;
-            if ((key === "ArrowUp" || key === "w" || key === "W") && dy === 0) {
-                dx = 0; dy = -GRID_SIZE;
-            }
-            if ((key === "ArrowDown" || key === "s" || key === "S") && dy === 0) {
-                dx = 0; dy = GRID_SIZE;
-            }
-            if ((key === "ArrowLeft" || key === "a" || key === "A") && dx === 0) {
-                dx = -GRID_SIZE; dy = 0;
-            }
-            if ((key === "ArrowRight" || key === "d" || key === "D") && dx === 0) {
-                dx = GRID_SIZE; dy = 0;
-            }
+            if (key === "ArrowUp" || key === "w" || key === "W") mudarDirecao(0, -GRID_SIZE);
+            if (key === "ArrowDown" || key === "s" || key === "S") mudarDirecao(0, GRID_SIZE);
+            if (key === "ArrowLeft" || key === "a" || key === "A") mudarDirecao(-GRID_SIZE, 0);
+            if (key === "ArrowRight" || key === "d" || key === "D") mudarDirecao(GRID_SIZE, 0);
         });
 
-        // Controles de Analógico e D-Pad do Xbox Otimizados
+        // Leitura de Controle Xbox com trava de neutro (evita travamentos)
         function lerControleXbox() {
             const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
             if (!gamepads[0]) return;
@@ -142,23 +143,28 @@
             
             const eixoX = gp.axes[0];
             const eixoY = gp.axes[1];
-            const deadzone = 0.3;
+            const deadzone = 0.5; // Zona morta maior para evitar qualquer toque acidental
 
-            if (Math.abs(eixoX) > deadzone || Math.abs(eixoY) > deadzone) {
-                if (Math.abs(eixoX) > Math.abs(eixoY)) {
-                    if (eixoX > 0 && dx === 0) { dx = GRID_SIZE; dy = 0; }
-                    else if (eixoX < 0 && dx === 0) { dx = -GRID_SIZE; dy = 0; }
-                } else {
-                    if (eixoY > 0 && dy === 0) { dx = 0; dy = GRID_SIZE; }
-                    else if (eixoY < 0 && dy === 0) { dx = 0; dy = -GRID_SIZE; }
-                }
+            if (Math.abs(eixoX) < deadzone && Math.abs(eixoY) < deadzone) {
+                controleNeutro = true; // Liberado para o próximo comando
             }
 
-            // D-Pad do Xbox
-            if (gp.buttons[12] && gp.buttons[12].pressed && dy === 0) { dx = 0; dy = -GRID_SIZE; }
-            if (gp.buttons[13] && gp.buttons[13].pressed && dy === 0) { dx = 0; dy = GRID_SIZE; }
-            if (gp.buttons[14] && gp.buttons[14].pressed && dx === 0) { dx = -GRID_SIZE; dy = 0; }
-            if (gp.buttons[15] && gp.buttons[15].pressed && dx === 0) { dx = GRID_SIZE; dy = 0; }
+            if (controleNeutro && (Math.abs(eixoX) > deadzone || Math.abs(eixoY) > deadzone)) {
+                if (Math.abs(eixoX) > Math.abs(eixoY)) {
+                    if (eixoX > 0) mudarDirecao(GRID_SIZE, 0);
+                    else mudarDirecao(-GRID_SIZE, 0);
+                } else {
+                    if (eixoY > 0) mudarDirecao(0, GRID_SIZE);
+                    else mudarDirecao(0, -GRID_SIZE);
+                }
+                controleNeutro = false;
+            }
+
+            // D-Pad do Xbox (Botões direcionais)
+            if (gp.buttons[12] && gp.buttons[12].pressed) mudarDirecao(0, -GRID_SIZE);
+            if (gp.buttons[13] && gp.buttons[13].pressed) mudarDirecao(0, GRID_SIZE);
+            if (gp.buttons[14] && gp.buttons[14].pressed) mudarDirecao(-GRID_SIZE, 0);
+            if (gp.buttons[15] && gp.buttons[15].pressed) mudarDirecao(GRID_SIZE, 0);
         }
 
         socket.on("atualizar_arena", (dados) => {
@@ -168,10 +174,13 @@
         function atualizar() {
             lerControleXbox();
 
-            // Nova cabeça baseada na direção do grid
+            // Aplica a direção armazenada no buffer com segurança
+            dx = proximaDirecao.dx;
+            dy = proximaDirecao.dy;
+
             const cabeca = { x: snake[0].x + dx, y: snake[0].y + dy };
 
-            // Limites das bordas
+            // Limites das bordas do mapa gigante
             if (cabeca.x < 0) cabeca.x = MAP_WIDTH - GRID_SIZE;
             if (cabeca.x >= MAP_WIDTH) cabeca.x = 0;
             if (cabeca.y < 0) cabeca.y = MAP_HEIGHT - GRID_SIZE;
@@ -186,17 +195,16 @@
                 moedasEl.innerText = moedasCount;
                 tamanhoEl.innerText = snake.length;
 
-                // Reposicionar comida longe e alinhada ao grid
+                // Reposicionar comida alinhada ao grid
                 comida.x = Math.floor(Math.random() * (MAP_WIDTH / GRID_SIZE)) * GRID_SIZE;
                 comida.y = Math.floor(Math.random() * (MAP_HEIGHT / GRID_SIZE)) * GRID_SIZE;
             } else {
-                // Remove a cauda se não comeu (mantém o tamanho correto)
-                snake.pop();
+                snake.pop(); // Remove a cauda se não comeu (crescimento correto)
             }
 
             tamanhoEl.innerText = snake.length;
 
-            // Sincronizar com o servidor multiplayer
+            // Sincronizar dados com o servidor online
             socket.emit("player_sync", { x: cabeca.x, y: cabeca.y, corpo: snake, cor: minhaCor });
         }
 
@@ -257,9 +265,9 @@
             ctx.restore();
         }
 
-        // Controlar a velocidade do game loop para o padrão de cobrinha (10 frames por segundo)
+        // Game Loop Clássico Estável (Velocidade ajustada de passo a passo)
         let ultimoTempo = 0;
-        const velocidadeJogo = 110; // Milissegundos por passo (menor = mais rápido)
+        const velocidadeJogo = 100; // Milissegundos por movimento da cobra
 
         function loop(tempoAtual) {
             if (!ultimoTempo) ultimoTempo = tempoAtual;
