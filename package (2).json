@@ -1,0 +1,13 @@
+{
+  "name": "neon-snake",
+  "version": "1.0.0",
+  "description": "Neon Snake Arena Multiplayer",
+  "main": "servidor.js",
+  "scripts": {
+    "start": "node servidor.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.2"
+  }
+}
